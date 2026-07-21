@@ -8,8 +8,13 @@ async function main() {
     mkdirSync("./data", { recursive: true });
   }
 
-  const url = process.env.DATABASE_URL ?? "file:./data/bookslot.db";
-  const client = createClient({ url });
+  const url =
+    process.env.DATABASE_URL ??
+    process.env.TURSO_DATABASE_URL ??
+    "file:./data/bookslot.db";
+  const authToken =
+    process.env.DATABASE_AUTH_TOKEN ?? process.env.TURSO_AUTH_TOKEN;
+  const client = createClient({ url, authToken });
   const db = drizzle(client);
 
   await migrate(db, { migrationsFolder: "./drizzle" });
