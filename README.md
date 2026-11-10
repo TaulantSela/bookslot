@@ -63,6 +63,22 @@ Style options (Pro): `data-primary`, `data-background`, `data-text` (hex colors)
 
 Events: `ready` and `resize` on every plan; `booked` and `error` on Pro. They arrive as callbacks (`onReady`, `onResize`, `onBooked`, `onError` or `widget.on(...)`) and as bubbling DOM events (`bookslot:booked`, …) on the mount element. Booking events are only posted to the origin that mounted the widget, and prefilled details travel by `postMessage`, never in the URL.
 
+**React / Next.js**: the [`@bookslot/react`](packages/react) package wraps the same script with typed props:
+```bash
+npm install @bookslot/react
+```
+```tsx
+import { BookSlotWidget } from "@bookslot/react";
+
+<BookSlotWidget
+  shop="your-shop-slug"
+  theme={{ primary: "#2dd4bf", scheme: "dark" }}   // Pro
+  customer={{ name: user.name, email: user.email }} // Pro
+  onBooked={(booking) => console.log(booking.when)} // Pro
+/>
+```
+It's a client component: an App Router server component can render it with plain props, and callbacks like `onBooked` go in a client component. It points at the hosted BookSlot by default; pass `bookslotUrl` for a self-hosted one.
+
 **Plain iframe** (no JavaScript, no resizing or events):
 ```html
 <iframe src="https://your-domain.com/embed/your-shop-slug" width="100%" height="760" style="border:0;max-width:480px" title="Book an appointment"></iframe>

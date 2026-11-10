@@ -1,5 +1,5 @@
 import { BookingSection } from "./booking-section";
-import type { BookSlotCustomer } from "./bookslot-widget";
+import type { BookSlotCustomer } from "@bookslot/react";
 import styles from "./clinic.module.css";
 
 // Stands in for the signed-in user. In a real app it comes from your auth session.

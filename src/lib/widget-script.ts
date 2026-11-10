@@ -141,11 +141,17 @@ export function widgetScript(base: string) {
       }
     });
 
-    return { version: 1, mount: mount };
+    return { version: 1, origin: BASE_ORIGIN, mount: mount };
   }
 
-  var api = window.BookSlot && window.BookSlot.version ? window.BookSlot : createApi();
-  window.BookSlot = api;
+  // One API per BookSlot address, so a page can load widgets from two
+  // BookSlots (hosted and self-hosted) without the second silently using
+  // the first. Loading the same widget.js twice reuses its API.
+  // window.BookSlot stays the first one loaded.
+  var registry = (window.__bookslot = window.__bookslot || {});
+  var api = registry[BASE_ORIGIN] || createApi();
+  registry[BASE_ORIGIN] = api;
+  if (!window.BookSlot || !window.BookSlot.version) window.BookSlot = api;
 
   // One-line embed: <script src=".../widget.js" data-shop="…"> mounts itself
   // right after the script tag. ?shop= in the src still works (older snippets).

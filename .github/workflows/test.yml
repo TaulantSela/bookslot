@@ -18,3 +18,5 @@ jobs:
       - run: npx tsc --noEmit
       - run: npm run lint
       - run: npm test
+      - run: npx tsc --noEmit -p packages/react
+      - run: npm run build:react

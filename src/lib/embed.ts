@@ -40,6 +40,15 @@ export function parseEmbedDomains(input: string) {
   return { domains, invalid };
 }
 
+const LOCAL_HOST = /^(localhost|(?:\d{1,3}\.){3}\d{1,3})(:\d{1,5})?$/;
+
+// A source without a scheme matches the embed's own scheme, so on an https
+// BookSlot "localhost:3000" would only allow https://localhost:3000. Local
+// development sites run on plain http, so local hosts get both.
+function sourcesFor(domain: string) {
+  return LOCAL_HOST.test(domain) ? [`http://${domain}`, `https://${domain}`] : [domain];
+}
+
 /**
  * CSP frame-ancestors for a shop's embed. Always allows our own origin (the
  * dashboard previews the widget); an empty list allows any site.
@@ -48,7 +57,8 @@ export function embedFrameAncestors(domains: string[] | null | undefined) {
   if (!domains || domains.length === 0) return "frame-ancestors 'self' *";
   const allowed = domains
     .map(normalizeEmbedDomain)
-    .filter((d): d is string => d !== null);
+    .filter((d): d is string => d !== null)
+    .flatMap(sourcesFor);
   // A restricted list that turned out entirely invalid must not widen to "*".
   return allowed.length
     ? `frame-ancestors 'self' ${allowed.join(" ")}`

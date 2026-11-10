@@ -5,9 +5,8 @@ import {
   BookSlotWidget,
   type BookSlotBooking,
   type BookSlotCustomer,
-  type BookSlotEvent,
   type BookSlotTheme,
-} from "./bookslot-widget";
+} from "@bookslot/react";
 import styles from "./clinic.module.css";
 
 // Service ids come from the clinic's BookSlot account.
@@ -27,19 +26,6 @@ const THEME: BookSlotTheme = {
   scheme: "dark",
 };
 
-function describe(event: BookSlotEvent) {
-  switch (event.type) {
-    case "ready":
-      return `ready (${event.detail.shop})`;
-    case "resize":
-      return `resize → ${event.detail.height}px`;
-    case "booked":
-      return `booked ${event.detail.appointmentId}`;
-    case "error":
-      return `error: ${event.detail.message}`;
-  }
-}
-
 export function BookingSection({
   patient,
   bookslotUrl,
@@ -51,10 +37,9 @@ export function BookingSection({
   const [booking, setBooking] = useState<BookSlotBooking | null>(null);
   const [log, setLog] = useState<string[]>([]);
 
-  function handleEvent(event: BookSlotEvent) {
+  function logEvent(text: string) {
     const time = new Date().toLocaleTimeString("en-GB");
-    setLog((prev) => [`${time}  ${describe(event)}`, ...prev].slice(0, 8));
-    if (event.type === "booked") setBooking(event.detail);
+    setLog((prev) => [`${time}  ${text}`, ...prev].slice(0, 8));
   }
 
   return (
@@ -105,7 +90,13 @@ export function BookingSection({
             theme={THEME}
             service={service}
             customer={patient}
-            onEvent={handleEvent}
+            onReady={({ shop }) => logEvent(`ready (${shop})`)}
+            onResize={({ height }) => logEvent(`resize → ${height}px`)}
+            onBooked={(booked) => {
+              logEvent(`booked ${booked.appointmentId}`);
+              setBooking(booked);
+            }}
+            onError={({ message }) => logEvent(`error: ${message}`)}
           />
         </div>
       </div>

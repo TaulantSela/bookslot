@@ -1,0 +1,48 @@
+{
+  "name": "@bookslot/react",
+  "version": "0.1.0",
+  "description": "React component for the BookSlot booking widget",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "booking",
+    "appointments",
+    "scheduling",
+    "widget",
+    "react",
+    "nextjs",
+    "bookslot"
+  ],
+  "homepage": "https://bookslot-rho.vercel.app",
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "scripts": {
+    "build": "tsup",
+    "prepublishOnly": "npm run build"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

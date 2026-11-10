@@ -14,6 +14,8 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Example host sites have their own setup.
     "examples/**",
+    // Built package output.
+    "packages/*/dist/**",
   ]),
 ]);
 

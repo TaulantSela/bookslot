@@ -52,3 +52,6 @@ next-env.d.ts
 examples/*/node_modules/
 examples/*/.next/
 examples/*/next-env.d.ts
+
+# built packages
+packages/*/dist/
