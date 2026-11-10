@@ -1,8 +1,8 @@
-import { and, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
-import { db } from "@/db";
-import { services, shops } from "@/db/schema";
 import { BookingWidget } from "@/components/booking-widget";
+import { getPublicBookingContext } from "@/lib/booking";
+import { buildBadgeUrl } from "@/lib/email";
+import { buildThemeCss } from "@/lib/theme";
 
 export default async function BookPage({
   params,
@@ -10,37 +10,23 @@ export default async function BookPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+  const context = await getPublicBookingContext(slug);
+  if (!context) notFound();
 
-  const [shop] = await db
-    .select()
-    .from(shops)
-    .where(eq(shops.slug, slug))
-    .limit(1);
-
-  if (!shop) notFound();
-
-  const activeServices = await db
-    .select()
-    .from(services)
-    .where(and(eq(services.shopId, shop.id), eq(services.active, true)))
-    .orderBy(services.sortOrder);
-
-  if (activeServices.length === 0) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-zinc-50 px-4">
-        <p className="text-zinc-600">Online booking is not available yet.</p>
-      </main>
-    );
-  }
+  const { shop, services, entitlements, bookingOpen, closedMessage } = context;
+  const css = buildThemeCss({ shopPrimary: shop.primaryColor, selector: ".bookslot" });
 
   return (
-    <main className="min-h-screen bg-zinc-50 px-4">
+    <main className="min-h-screen bg-zinc-50 px-4 py-8">
+      <style dangerouslySetInnerHTML={{ __html: css }} />
       <BookingWidget
         shopSlug={shop.slug}
         shopName={shop.name}
-        primaryColor={shop.primaryColor}
         timezone={shop.timezone}
-        services={activeServices}
+        services={services}
+        bookingOpen={bookingOpen}
+        closedMessage={closedMessage}
+        badgeHref={entitlements.showBadge ? buildBadgeUrl(shop.slug) : undefined}
       />
     </main>
   );

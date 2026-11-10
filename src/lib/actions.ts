@@ -21,9 +21,16 @@ import {
   verifyPassword,
   getUserByEmail,
 } from "@/lib/auth";
-import { getSlotsForDay, insertAppointmentIfFree } from "@/lib/booking";
+import {
+  getSlotsForDay,
+  insertAppointmentIfFree,
+  isAcceptingOnlineBookings,
+  noOnlineBookingsMessage,
+} from "@/lib/booking";
 import { buildCancelUrl, sendBookingConfirmation } from "@/lib/email";
+import { MAX_EMBED_DOMAINS, parseEmbedDomains } from "@/lib/embed";
 import { newId, slugify } from "@/lib/id";
+import { formatAppointmentRange } from "@/lib/slots";
 import { isValidDateString } from "@/lib/slots-internal";
 import {
   bookingSchema,
@@ -38,6 +45,18 @@ export type ActionState = {
   error?: string;
   success?: string;
 };
+
+export type BookingResult = {
+  appointmentId: string;
+  serviceId: string;
+  serviceName: string;
+  startsAt: string;
+  endsAt: string;
+  /** Human-readable date and time range in the shop's timezone. */
+  when: string;
+};
+
+export type BookingActionState = ActionState & { booking?: BookingResult };
 
 // Dashboard pages read straight from the database, so every dashboard
 // mutation refreshes them; otherwise the UI keeps showing the old values.
@@ -170,9 +189,9 @@ export async function logoutAction() {
 const SLOT_TAKEN_ERROR = "That time slot is no longer available.";
 
 export async function createBookingAction(
-  _prev: ActionState,
+  _prev: BookingActionState,
   formData: FormData,
-): Promise<ActionState> {
+): Promise<BookingActionState> {
   const parsed = bookingSchema.safeParse({
     shopSlug: formData.get("shopSlug"),
     serviceId: formData.get("serviceId"),
@@ -201,6 +220,10 @@ export async function createBookingAction(
     .limit(1);
 
   if (!shop) return { error: "Shop not found." };
+
+  if (!(await isAcceptingOnlineBookings(shop))) {
+    return { error: noOnlineBookingsMessage(shop) };
+  }
 
   const [service] = await db
     .select()
@@ -248,7 +271,50 @@ export async function createBookingAction(
     });
   }
 
-  redirect(`/book/${shop.slug}/success?appt=${appointmentId}`);
+  // Returned rather than redirected, so the widget can confirm inline (the
+  // customer stays inside the embed) and tell the host page about it.
+  return {
+    booking: {
+      appointmentId,
+      serviceId: service.id,
+      serviceName: service.name,
+      startsAt: slot.start.toISOString(),
+      endsAt: slot.end.toISOString(),
+      when: formatAppointmentRange(slot.start, slot.end, shop.timezone),
+    },
+  };
+}
+
+export async function saveEmbedDomainsAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const session = await getSession();
+  if (!session) redirect("/login");
+  const shop = await requireUserShop(session.userId);
+
+  const { domains, invalid } = parseEmbedDomains(
+    String(formData.get("domains") ?? ""),
+  );
+
+  if (invalid.length > 0) {
+    return { error: `Not a valid domain: ${invalid.join(", ")}` };
+  }
+  if (domains.length > MAX_EMBED_DOMAINS) {
+    return { error: `You can list up to ${MAX_EMBED_DOMAINS} domains.` };
+  }
+
+  await db
+    .update(shops)
+    .set({ embedDomains: domains.length ? domains : null })
+    .where(eq(shops.id, shop.id));
+
+  refreshDashboard();
+  return {
+    success: domains.length
+      ? `Saved. Only ${domains.join(", ")} can embed your widget.`
+      : "Saved. Any website can embed your widget.",
+  };
 }
 
 export async function saveServiceAction(formData: FormData) {

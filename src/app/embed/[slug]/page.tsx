@@ -1,40 +1,67 @@
-import { and, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
-import { db } from "@/db";
-import { services, shops } from "@/db/schema";
 import { BookingWidget } from "@/components/booking-widget";
+import { getPublicBookingContext } from "@/lib/booking";
+import { parseInstanceId, parseParentOrigin } from "@/lib/embed";
+import { buildBadgeUrl } from "@/lib/email";
+import { buildThemeCss, parseThemeParams } from "@/lib/theme";
 
+type Query = Record<string, string | string[] | undefined>;
+
+function first(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+// Rendered inside an iframe on other sites (see src/app/widget.js). Which
+// sites may frame it is enforced by the CSP set in src/proxy.ts. Plan
+// entitlements are applied here, on the server, so a host page can't unlock
+// paid options by editing its embed code.
 export default async function EmbedPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<Query>;
 }) {
-  const { slug } = await params;
+  const [{ slug }, query] = await Promise.all([params, searchParams]);
+  const context = await getPublicBookingContext(slug);
+  if (!context) notFound();
 
-  const [shop] = await db
-    .select()
-    .from(shops)
-    .where(eq(shops.slug, slug))
-    .limit(1);
+  const { shop, services, entitlements, bookingOpen, closedMessage } = context;
+  const overrides = entitlements.customTheme ? parseThemeParams(query) : {};
+  const requestedService = first(query.service);
+  const initialServiceId =
+    entitlements.prefill && services.some((s) => s.id === requestedService)
+      ? requestedService
+      : undefined;
 
-  if (!shop) notFound();
-
-  const activeServices = await db
-    .select()
-    .from(services)
-    .where(and(eq(services.shopId, shop.id), eq(services.active, true)))
-    .orderBy(services.sortOrder);
+  const css = buildThemeCss({
+    shopPrimary: shop.primaryColor,
+    overrides,
+    selector: ":root",
+    paintBody: true,
+  });
 
   return (
-    <main className="min-h-screen bg-white">
+    <>
+      {/* Built only from validated hex colors, numbers and presets (src/lib/theme.ts). */}
+      <style dangerouslySetInnerHTML={{ __html: css }} />
       <BookingWidget
+        embed
         shopSlug={shop.slug}
         shopName={shop.name}
-        primaryColor={shop.primaryColor}
         timezone={shop.timezone}
-        services={activeServices}
-        embed
+        services={services}
+        bookingOpen={bookingOpen}
+        closedMessage={closedMessage}
+        initialServiceId={initialServiceId}
+        badgeHref={entitlements.showBadge ? buildBadgeUrl(shop.slug) : undefined}
+        host={{
+          origin: parseParentOrigin(first(query.origin)),
+          instance: parseInstanceId(first(query.instance)),
+          events: entitlements.hostEvents,
+          prefill: entitlements.prefill,
+        }}
       />
-    </main>
+    </>
   );
 }

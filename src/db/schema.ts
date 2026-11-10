@@ -22,6 +22,10 @@ export const shops = sqliteTable("shops", {
   phone: text("phone"),
   address: text("address"),
   reminderHoursBefore: integer("reminder_hours_before").notNull().default(24),
+  /** Billing plan, set manually after payment. See src/lib/plans.ts. */
+  plan: text("plan").notNull().default("free"),
+  /** Sites allowed to embed the widget (CSP frame-ancestors). Null or empty = any site. */
+  embedDomains: text("embed_domains", { mode: "json" }).$type<string[]>(),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
 });
 
