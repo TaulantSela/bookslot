@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Besa Dental · Struga",
+  title: "Buzëqeshja Dental · Struga",
   description: "BookSlot example: Next.js site on the Pro plan",
 };
 

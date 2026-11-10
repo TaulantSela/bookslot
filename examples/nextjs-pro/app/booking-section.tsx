@@ -12,9 +12,9 @@ import styles from "./clinic.module.css";
 
 // Service ids come from the clinic's BookSlot account.
 const TREATMENTS = [
-  { id: "svc_besa_checkup", name: "Check-up & cleaning", detail: "45 min · 1500 MKD" },
-  { id: "svc_besa_consult", name: "Consultation", detail: "30 min · 800 MKD" },
-  { id: "svc_besa_whitening", name: "Teeth whitening", detail: "60 min · 6000 MKD" },
+  { id: "svc_buzeqeshja_checkup", name: "Check-up & cleaning", detail: "45 min · 1500 MKD" },
+  { id: "svc_buzeqeshja_consult", name: "Consultation", detail: "30 min · 800 MKD" },
+  { id: "svc_buzeqeshja_whitening", name: "Teeth whitening", detail: "60 min · 6000 MKD" },
 ];
 
 // Matches the clinic's own brand instead of BookSlot's defaults (Pro).
@@ -101,7 +101,7 @@ export function BookingSection({
         <div className={styles.widget}>
           <BookSlotWidget
             bookslotUrl={bookslotUrl}
-            shop="besa-dental"
+            shop="buzeqeshja-dental"
             theme={THEME}
             service={service}
             customer={patient}

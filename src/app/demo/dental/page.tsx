@@ -5,7 +5,7 @@ import {
 } from "../../../../examples/nextjs-pro/app/clinic-site";
 
 export const metadata: Metadata = {
-  title: "Besa Dental Clinic · BookSlot demo",
+  title: "Buzëqeshja Dental Clinic · BookSlot demo",
   description: "A Next.js clinic website using the BookSlot widget on the Pro plan.",
 };
 
