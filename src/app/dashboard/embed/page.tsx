@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { Card } from "@/components/ui";
 import { EmbedDomainsForm } from "@/components/embed-domains-form";
+import { UpgradeContact } from "@/components/upgrade-contact";
 import { getDashboardContext } from "@/lib/actions";
 import { monthlyBookingCount } from "@/lib/booking";
 import { buildBookingUrl, buildEmbedUrl } from "@/lib/email";
@@ -119,18 +120,14 @@ export function Booking({ user }) {
             <Feature on={plan.prefill}>Preselect a service and prefill customer details</Feature>
             <Feature on={plan.hostEvents}>Booking events for your site (analytics, redirects)</Feature>
           </ul>
-          {!isPro && (
-            <p className="mt-4 text-sm text-zinc-600">
-              Want the Pro options?{" "}
-              {salesEmail ? (
-                <a href={`mailto:${salesEmail}?subject=BookSlot Pro for ${shop.slug}`} className="text-blue-600 hover:underline">
-                  Ask us to upgrade
-                </a>
-              ) : (
-                "Ask us to upgrade your shop."
-              )}
-            </p>
-          )}
+          {!isPro &&
+            (salesEmail ? (
+              <UpgradeContact email={salesEmail} shopSlug={shop.slug} />
+            ) : (
+              <p className="mt-4 text-sm text-zinc-600">
+                Want the Pro options? Ask us to upgrade your shop.
+              </p>
+            ))}
         </Card>
 
         <Card>
