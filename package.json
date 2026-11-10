@@ -12,7 +12,8 @@
     "db:seed": "tsx scripts/seed.ts",
     "db:setup": "npm run db:migrate && npm run db:seed",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "example:pro": "next dev examples/nextjs-pro --webpack -p 3001"
   },
   "dependencies": {
     "@libsql/client": "^0.17.3",

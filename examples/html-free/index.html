@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lakeside Barbers · Struga</title>
+    <style>
+      :root {
+        --ink: #1c1917;
+        --paper: #faf6f0;
+        --brass: #b45309;
+        --muted: #78716c;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: Georgia, "Times New Roman", serif;
+        color: var(--ink);
+        background: var(--paper);
+      }
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 20px 32px;
+        background: var(--ink);
+        color: var(--paper);
+      }
+      header strong { font-size: 22px; letter-spacing: 0.04em; }
+      header nav a { color: #d6d3d1; margin-left: 20px; text-decoration: none; font-size: 15px; }
+      .hero {
+        padding: 72px 32px 56px;
+        background: linear-gradient(180deg, var(--ink), #292524);
+        color: var(--paper);
+        text-align: center;
+      }
+      .hero h1 { font-size: 44px; margin: 0 0 12px; font-weight: normal; }
+      .hero p { color: #d6d3d1; margin: 0; font-size: 18px; }
+      main {
+        max-width: 1040px;
+        margin: 0 auto;
+        padding: 56px 24px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 48px;
+        align-items: start;
+      }
+      h2 { font-weight: normal; font-size: 28px; margin: 0 0 16px; }
+      .prices { list-style: none; padding: 0; margin: 0 0 24px; }
+      .prices li {
+        display: flex;
+        justify-content: space-between;
+        padding: 12px 0;
+        border-bottom: 1px dashed #d6d3d1;
+        font-size: 17px;
+      }
+      .prices span { color: var(--brass); }
+      .note { color: var(--muted); font-size: 15px; line-height: 1.6; }
+      footer { text-align: center; color: var(--muted); padding: 32px; font-size: 14px; }
+      @media (max-width: 760px) {
+        main { grid-template-columns: 1fr; }
+        header { padding: 16px; }
+        header nav { display: none; }
+        .hero h1 { font-size: 32px; }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <strong>LAKESIDE BARBERS</strong>
+      <nav>
+        <a href="#prices">Prices</a>
+        <a href="#book">Book</a>
+        <a href="#visit">Visit</a>
+      </nav>
+    </header>
+
+    <section class="hero">
+      <h1>Sharp cuts in the old town</h1>
+      <p>Walk-ins welcome. Or skip the wait and book your chair below.</p>
+    </section>
+
+    <main>
+      <div id="prices">
+        <h2>Prices</h2>
+        <ul class="prices">
+          <li>Haircut <span>600 MKD</span></li>
+          <li>Beard trim <span>300 MKD</span></li>
+          <li>Haircut + beard <span>800 MKD</span></li>
+        </ul>
+        <p class="note" id="visit">
+          Tuesday to Saturday, 09:00–19:00<br />
+          Rruga Marshal Tito, Struga · +389 70 111 222
+        </p>
+      </div>
+
+      <div id="book">
+        <h2>Book a chair</h2>
+        <!--
+          BookSlot, Free plan: this one line is the whole integration.
+          The widget mounts right here and resizes itself to fit.
+          It uses the colour set in the BookSlot dashboard and shows a
+          "Powered by BookSlot" badge. Theme options (data-primary,
+          data-scheme, …) need the Pro plan and are ignored on Free.
+
+          Replace http://localhost:3000 with your BookSlot address,
+          e.g. https://bookslot-rho.vercel.app
+        -->
+        <script src="http://localhost:3000/widget.js" data-shop="lakeside-barbers" async></script>
+      </div>
+    </main>
+
+    <footer>© Lakeside Barbers</footer>
+  </body>
+</html>
