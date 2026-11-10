@@ -69,7 +69,7 @@ Events: `ready` and `resize` on every plan; `booked` and `error` on Pro. They ar
 
 **Allowed websites:** in **Dashboard → Widget**, owners can list the sites allowed to embed their widget (sent as CSP `frame-ancestors`). Empty means any site. Every other page refuses to be framed.
 
-Copy exact codes from **Dashboard → Widget** after signing up.
+Copy exact codes from **Dashboard → Widget** after signing up. [`examples/`](examples/README.md) has two complete host sites: plain HTML on the Free plan and Next.js on the Pro plan.
 
 ## Plans
 
