@@ -124,6 +124,12 @@ export function buildBookingUrl(slug: string) {
   return `${base}/book/${slug}`;
 }
 
+/** Where the free-plan "Powered by BookSlot" badge links, tagged with the shop. */
+export function buildBadgeUrl(slug: string) {
+  const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  return `${base}/?ref=${encodeURIComponent(slug)}`;
+}
+
 export function buildEmbedUrl(slug: string) {
   const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   return `${base}/embed/${slug}`;

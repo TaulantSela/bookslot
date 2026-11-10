@@ -1,4 +1,5 @@
-import { and, eq, gt, lt, ne, sql } from "drizzle-orm";
+import { and, count, eq, gt, gte, lt, ne, sql } from "drizzle-orm";
+import { formatInTimeZone } from "date-fns-tz";
 import { db } from "@/db";
 import {
   appointments,
@@ -9,8 +10,80 @@ import {
   type Service,
   type Shop,
 } from "@/db/schema";
+import { entitlementsFor } from "@/lib/plans";
 import { getAvailableSlots } from "@/lib/slots";
-import { zonedDayRange } from "@/lib/slots-internal";
+import { zonedDateTime, zonedDayRange } from "@/lib/slots-internal";
+
+/** Bookings (not cancelled) a shop received since the 1st of this month, in its timezone. */
+export async function monthlyBookingCount(
+  shop: Pick<Shop, "id" | "timezone">,
+  now = new Date(),
+) {
+  const monthStart = zonedDateTime(
+    formatInTimeZone(now, shop.timezone, "yyyy-MM-01"),
+    "00:00",
+    shop.timezone,
+  );
+  const [row] = await db
+    .select({ value: count() })
+    .from(appointments)
+    .where(
+      and(
+        eq(appointments.shopId, shop.id),
+        ne(appointments.status, "cancelled"),
+        gte(appointments.createdAt, monthStart),
+      ),
+    );
+  return row?.value ?? 0;
+}
+
+export function noOnlineBookingsMessage(shop: Pick<Shop, "name" | "phone">) {
+  return `${shop.name} isn't taking more online bookings this month. ${
+    shop.phone ? `Please call ${shop.phone}.` : "Please contact them directly."
+  }`;
+}
+
+/** Everything the public booking page and the embed need for one shop. */
+export async function getPublicBookingContext(slug: string) {
+  const [shop] = await db
+    .select()
+    .from(shops)
+    .where(eq(shops.slug, slug))
+    .limit(1);
+  if (!shop) return null;
+
+  const [activeServices, bookingOpen] = await Promise.all([
+    db
+      .select({
+        id: services.id,
+        name: services.name,
+        durationMinutes: services.durationMinutes,
+        priceCents: services.priceCents,
+      })
+      .from(services)
+      .where(and(eq(services.shopId, shop.id), eq(services.active, true)))
+      .orderBy(services.sortOrder),
+    isAcceptingOnlineBookings(shop),
+  ]);
+
+  return {
+    shop,
+    services: activeServices,
+    entitlements: entitlementsFor(shop.plan),
+    bookingOpen,
+    closedMessage: bookingOpen ? undefined : noOnlineBookingsMessage(shop),
+  };
+}
+
+/** Whether the shop's plan still allows online bookings this month. */
+export async function isAcceptingOnlineBookings(
+  shop: Pick<Shop, "id" | "timezone" | "plan">,
+  now = new Date(),
+) {
+  const limit = entitlementsFor(shop.plan).monthlyBookingLimit;
+  if (limit === null) return true;
+  return (await monthlyBookingCount(shop, now)) < limit;
+}
 
 /** Bookable slots for one service on one calendar date (yyyy-MM-dd, shop timezone). */
 export async function getSlotsForDay({

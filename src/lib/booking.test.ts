@@ -201,6 +201,90 @@ describe("cancelAppointmentByToken", () => {
   });
 });
 
+describe("monthly booking limit", () => {
+  const capShop = { id: "shop_cap", timezone: TZ, plan: "free" };
+
+  beforeAll(async () => {
+    await db.insert(schema.shops).values({
+      id: capShop.id,
+      userId: "usr_test",
+      slug: capShop.id,
+      name: "Cap shop",
+      timezone: TZ,
+      plan: "free",
+      createdAt: new Date(),
+    });
+  });
+
+  async function seedBookings(n: number, createdAt: Date, status = "confirmed") {
+    for (let i = 0; i < n; i++) {
+      await db.insert(schema.appointments).values({
+        id: newId("appt"),
+        shopId: capShop.id,
+        serviceId: service.id,
+        customerName: "C",
+        customerPhone: "1",
+        startsAt: at("2030-02-01", "09:00"),
+        endsAt: at("2030-02-01", "09:30"),
+        status,
+        cancelToken: newId("cancel"),
+        createdAt,
+      });
+    }
+  }
+
+  // 15 March 2030, noon in Skopje
+  const now = new Date("2030-03-15T11:00:00Z");
+
+  it("counts only this month's non-cancelled bookings, in the shop's timezone", async () => {
+    await seedBookings(3, new Date("2030-03-10T10:00:00Z"));
+    await seedBookings(2, new Date("2030-03-10T10:00:00Z"), "cancelled");
+    await seedBookings(4, new Date("2030-02-20T10:00:00Z")); // last month
+    // 23:30 UTC on 28 Feb is already 1 March in Skopje (UTC+1).
+    await seedBookings(1, new Date("2030-02-28T23:30:00Z"));
+    expect(await booking.monthlyBookingCount(capShop, now)).toBe(4);
+  });
+
+  it("stops accepting bookings on the free plan at the limit", async () => {
+    const { PLAN_ENTITLEMENTS } = await import("./plans");
+    const limit = PLAN_ENTITLEMENTS.free.monthlyBookingLimit!;
+    const current = await booking.monthlyBookingCount(capShop, now);
+
+    await seedBookings(limit - current - 1, new Date("2030-03-12T10:00:00Z"));
+    expect(await booking.isAcceptingOnlineBookings(capShop, now)).toBe(true);
+
+    await seedBookings(1, new Date("2030-03-12T10:00:00Z"));
+    expect(await booking.isAcceptingOnlineBookings(capShop, now)).toBe(false);
+  });
+
+  it("never limits a pro shop", async () => {
+    expect(
+      await booking.isAcceptingOnlineBookings({ ...capShop, plan: "pro" }, now),
+    ).toBe(true);
+  });
+
+  it("reopens next month", async () => {
+    expect(
+      await booking.isAcceptingOnlineBookings(capShop, new Date("2030-04-02T08:00:00Z")),
+    ).toBe(true);
+  });
+});
+
+describe("getPublicBookingContext", () => {
+  it("returns null for an unknown shop", async () => {
+    expect(await booking.getPublicBookingContext("no-such-shop")).toBeNull();
+  });
+
+  it("loads the shop, its active services and its plan", async () => {
+    const context = await booking.getPublicBookingContext(shop.id);
+    expect(context?.shop.id).toBe(shop.id);
+    expect(context?.services.map((s) => s.id)).toEqual([service.id]);
+    expect(context?.entitlements.showBadge).toBe(true);
+    expect(context?.bookingOpen).toBe(true);
+    expect(context?.closedMessage).toBeUndefined();
+  });
+});
+
 describe("canCustomerCancel", () => {
   const now = new Date("2030-01-07T08:00:00Z");
 
