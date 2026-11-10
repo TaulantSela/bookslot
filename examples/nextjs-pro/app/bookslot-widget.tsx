@@ -7,8 +7,6 @@
 import Script from "next/script";
 import { useEffect, useRef, useState } from "react";
 
-const BOOKSLOT_URL = process.env.NEXT_PUBLIC_BOOKSLOT_URL ?? "http://localhost:3000";
-
 export type BookSlotTheme = {
   primary?: string;
   background?: string;
@@ -58,12 +56,15 @@ declare global {
 const EVENT_TYPES: BookSlotEvent["type"][] = ["ready", "resize", "booked", "error"];
 
 export function BookSlotWidget({
+  bookslotUrl = process.env.NEXT_PUBLIC_BOOKSLOT_URL ?? "http://localhost:3000",
   shop,
   theme,
   service,
   customer,
   onEvent,
 }: {
+  /** Where BookSlot runs, e.g. https://bookslot-rho.vercel.app. "" means this same site. */
+  bookslotUrl?: string;
   shop: string;
   theme?: BookSlotTheme;
   /** Service id to preselect. Changing it later switches the widget's selection. */
@@ -116,7 +117,7 @@ export function BookSlotWidget({
 
   return (
     <>
-      <Script src={`${BOOKSLOT_URL}/widget.js`} onReady={() => setScriptReady(true)} />
+      <Script src={`${bookslotUrl}/widget.js`} onReady={() => setScriptReady(true)} />
       <div ref={container} />
     </>
   );

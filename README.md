@@ -29,6 +29,7 @@ Open [http://localhost:3000](http://localhost:3000)
 | Password | `demo12345` |
 | Booking page | [/book/demo-salon](http://localhost:3000/book/demo-salon) |
 | Embed widget | [/embed/demo-salon](http://localhost:3000/embed/demo-salon) |
+| Demo websites | [/demo](http://localhost:3000/demo) (run `scripts/seed-examples.ts` first) |
 
 ## Embed on any website
 
@@ -53,7 +54,7 @@ Style options (Pro): `data-primary`, `data-background`, `data-text` (hex colors)
     shop: "your-shop-slug",
     theme: { primary: "#f5c542", scheme: "auto", radius: 8, font: "system" }, // Pro
     service: "svc_…",                                                         // Pro: preselect
-    prefill: { name: "Ana", email: "ana@example.com", phone: "070123456" },  // Pro
+    prefill: { name: "Arta", email: "arta@example.com", phone: "070123456" }, // Pro
     onBooked: (booking) => console.log(booking.appointmentId, booking.when), // Pro
   });
   // widget.prefill({...}), widget.on("booked", fn), widget.destroy()
@@ -147,6 +148,7 @@ src/
 | `npm run build` | Migrate DB + production build |
 | `npm run db:setup` | Migrate + seed demo data |
 | `npm run db:seed` | Seed demo shop only |
+| `npm run example:pro` | Next.js example site on port 3001 (see `examples/`) |
 | `npm test` | Unit tests (slot engine, slugs, email escaping) and booking integration tests on a throwaway SQLite file |
 
 ## Roadmap (not in v1)

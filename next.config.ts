@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // /demo/barbershop reads this file at request time.
+  outputFileTracingIncludes: {
+    "/demo/barbershop": ["./examples/html-free/index.html"],
+  },
   async headers() {
     return [
       {

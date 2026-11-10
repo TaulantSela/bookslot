@@ -64,7 +64,7 @@ export default async function EmbedPage() {
   const widget = BookSlot.mount("#booking", {
     shop: "${shop.slug}",
     theme: { primary: "#f5c542", scheme: "auto", radius: 8, font: "system" },
-    prefill: { name: "Ana Petrovska", email: "ana@example.com", phone: "070123456" },
+    prefill: { name: "Arta Selmani", email: "arta@example.com", phone: "070123456" },
     onBooked: (booking) => console.log("Booked", booking),
   });
 </script>`;

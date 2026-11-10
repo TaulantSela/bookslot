@@ -8,12 +8,13 @@ import {
   type BookSlotEvent,
   type BookSlotTheme,
 } from "./bookslot-widget";
+import styles from "./clinic.module.css";
 
 // Service ids come from the clinic's BookSlot account.
 const TREATMENTS = [
-  { id: "svc_smile_checkup", name: "Check-up & cleaning", detail: "45 min · 1500 MKD" },
-  { id: "svc_smile_consult", name: "Consultation", detail: "30 min · 800 MKD" },
-  { id: "svc_smile_whitening", name: "Teeth whitening", detail: "60 min · 6000 MKD" },
+  { id: "svc_besa_checkup", name: "Check-up & cleaning", detail: "45 min · 1500 MKD" },
+  { id: "svc_besa_consult", name: "Consultation", detail: "30 min · 800 MKD" },
+  { id: "svc_besa_whitening", name: "Teeth whitening", detail: "60 min · 6000 MKD" },
 ];
 
 // Matches the clinic's own brand instead of BookSlot's defaults (Pro).
@@ -39,7 +40,13 @@ function describe(event: BookSlotEvent) {
   }
 }
 
-export function BookingSection({ patient }: { patient: BookSlotCustomer }) {
+export function BookingSection({
+  patient,
+  bookslotUrl,
+}: {
+  patient: BookSlotCustomer;
+  bookslotUrl: string;
+}) {
   const [service, setService] = useState(TREATMENTS[0].id);
   const [booking, setBooking] = useState<BookSlotBooking | null>(null);
   const [log, setLog] = useState<string[]>([]);
@@ -51,16 +58,16 @@ export function BookingSection({ patient }: { patient: BookSlotCustomer }) {
   }
 
   return (
-    <section className="booking" id="book">
-      <div className="booking-inner">
+    <section className={styles.booking} id="book">
+      <div className={styles.bookingInner}>
         <div>
           <h2>Book a visit</h2>
-          <p className="lead">
+          <p className={styles.lead}>
             You’re signed in, so your details are already filled in. Pick a
             treatment and a time.
           </p>
 
-          <ul className="treatments">
+          <ul className={styles.treatments}>
             {TREATMENTS.map((t) => (
               <li key={t.id}>
                 <button
@@ -76,24 +83,25 @@ export function BookingSection({ patient }: { patient: BookSlotCustomer }) {
           </ul>
 
           {booking && (
-            <div className="confirmation" role="status">
+            <div className={styles.confirmation} role="status">
               <strong>Added to your patient portal</strong>
               <p>
                 {booking.serviceName}, {booking.when}
               </p>
-              <p className="muted">Appointment {booking.appointmentId}</p>
+              <p className={styles.muted}>Appointment {booking.appointmentId}</p>
             </div>
           )}
 
-          <div className="events">
+          <div className={styles.events}>
             <span>Events this site received from BookSlot</span>
             <pre>{log.length ? log.join("\n") : "waiting…"}</pre>
           </div>
         </div>
 
-        <div className="widget">
+        <div className={styles.widget}>
           <BookSlotWidget
-            shop="smile-dental"
+            bookslotUrl={bookslotUrl}
+            shop="besa-dental"
             theme={THEME}
             service={service}
             customer={patient}

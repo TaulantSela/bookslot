@@ -30,7 +30,7 @@ export default function HomePage() {
             <Link href="/register">
               <Button className="px-6 py-3 text-base">Create your booking page</Button>
             </Link>
-            <Link href="/book/demo-salon">
+            <Link href="/demo">
               <Button variant="secondary" className="px-6 py-3 text-base">
                 See demo
               </Button>
