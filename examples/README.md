@@ -5,7 +5,7 @@ Two small websites that embed BookSlot, one per plan. BookSlot also serves both 
 | | Site | Plan | Integration | Live in the demo |
 |---|---|---|---|---|
 | [`html-free/`](html-free/index.html) | Lakeside Barbers | Free | One `<script>` tag | `/demo/barbershop` |
-| [`nextjs-pro/`](nextjs-pro/app/bookslot-widget.tsx) | Bright Smile Dental | Pro | React component around `BookSlot.mount` | `/demo/dental` |
+| [`nextjs-pro/`](nextjs-pro/app/booking-section.tsx) | Bright Smile Dental | Pro | [`@bookslot/react`](../packages/react) | `/demo/dental` |
 
 The Free site gets the widget in the shop's dashboard colour, with the "Powered by BookSlot" badge, resizing to fit.
 
@@ -16,7 +16,7 @@ The Pro site goes further:
 - **Booking events:** a booking shows up in the clinic's page through the `booked` event.
 - **Allowed websites:** only `localhost:3001` (and BookSlot itself) may embed the clinic's widget.
 
-`nextjs-pro/app/bookslot-widget.tsx` is the file to copy into a React or Next.js app.
+The Next.js site uses the [`@bookslot/react`](../packages/react) package (`npm install @bookslot/react`). Inside this repo the import resolves to the package source, so the example always runs the current code.
 
 The demo pages render these exact files:
 - `/demo/barbershop` serves `html-free/index.html` with the widget address swapped.

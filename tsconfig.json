@@ -19,7 +19,8 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@bookslot/react": ["./packages/react/src/index.tsx"]
     }
   },
   "include": [

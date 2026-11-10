@@ -13,7 +13,8 @@
     "db:setup": "npm run db:migrate && npm run db:seed",
     "test": "vitest run",
     "test:watch": "vitest",
-    "example:pro": "next dev examples/nextjs-pro --webpack -p 3001"
+    "example:pro": "next dev examples/nextjs-pro --webpack -p 3001",
+    "build:react": "npm run build --prefix packages/react"
   },
   "dependencies": {
     "@libsql/client": "^0.17.3",
@@ -41,6 +42,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.4.6",
     "tailwindcss": "^4",
+    "tsup": "^8.5.1",
     "tsx": "^4.22.4",
     "typescript": "^5",
     "vitest": "^5.1.0"

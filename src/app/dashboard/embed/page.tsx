@@ -35,6 +35,10 @@ export default async function EmbedPage() {
   const shop = ctx.shop;
 
   const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  // The address @bookslot/react uses when no bookslotUrl is passed. (Not
+  // imported: that package is a client module, so a server component would
+  // get a client reference instead of the string.)
+  const packageDefaultUrl = "https://bookslot-rho.vercel.app";
   const plan = entitlementsFor(shop.plan);
   const isPro = shop.plan === "pro";
   const used = await monthlyBookingCount(shop);
@@ -69,29 +73,17 @@ export default async function EmbedPage() {
   });
 </script>`;
 
-  const reactCode = `"use client";
-import Script from "next/script";
-import { useEffect, useRef, useState } from "react";
+  const reactCode = `// npm install @bookslot/react
+import { BookSlotWidget } from "@bookslot/react";
 
 export function Booking({ user }) {
-  const ref = useRef(null);
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    if (!loaded || !ref.current) return;
-    const widget = window.BookSlot.mount(ref.current, {
-      shop: "${shop.slug}",
-      prefill: { name: user?.name, email: user?.email },
-      onBooked: (booking) => console.log("Booked", booking.appointmentId),
-    });
-    return () => widget.destroy();
-  }, [loaded, user]);
-
   return (
-    <>
-      <Script src="${base}/widget.js" onLoad={() => setLoaded(true)} />
-      <div ref={ref} />
-    </>
+    <BookSlotWidget
+      shop="${shop.slug}"${base === packageDefaultUrl ? "" : `
+      bookslotUrl="${base}"`}
+      customer={{ name: user?.name, email: user?.email }}
+      onBooked={(booking) => console.log("Booked", booking.appointmentId)}
+    />
   );
 }`;
 
@@ -176,7 +168,7 @@ export function Booking({ user }) {
       />
       <Snippet
         title="4 · React / Next.js"
-        note="Mount in an effect and destroy on unmount."
+        note="Install the @bookslot/react package. Works in Next.js, Vite and Remix. Callbacks like onBooked need a client component. Theme, service, customer and onBooked need Pro."
         code={reactCode}
       />
       <Card>
