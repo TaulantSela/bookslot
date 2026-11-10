@@ -10,7 +10,9 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx scripts/migrate.ts",
     "db:seed": "tsx scripts/seed.ts",
-    "db:setup": "npm run db:migrate && npm run db:seed"
+    "db:setup": "npm run db:migrate && npm run db:seed",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@libsql/client": "^0.17.3",
@@ -31,7 +33,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/bcryptjs": "^2.4.6",
-    "@types/node": "^20",
+    "@types/node": "^22.20.5",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "drizzle-kit": "^0.31.10",
@@ -39,6 +41,7 @@
     "eslint-config-next": "16.4.6",
     "tailwindcss": "^4",
     "tsx": "^4.22.4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^5.1.0"
   }
 }
