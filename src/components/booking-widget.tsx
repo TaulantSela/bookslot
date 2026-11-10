@@ -99,6 +99,17 @@ export function BookingWidget({
   const [booked, setBooked] = useState<BookingResult | null>(null);
   const latestSlotsRequest = useRef(0);
   const rootRef = useRef<HTMLDivElement>(null);
+  // Current choice, readable from the host message listener: a host page can
+  // switch the service after the customer already picked a date.
+  const selection = useRef({ date: "", serviceId });
+
+  function chooseService(nextServiceId: string) {
+    if (nextServiceId === selection.current.serviceId) return;
+    selection.current.serviceId = nextServiceId;
+    setServiceId(nextServiceId);
+    // Times depend on the service's duration, so reload them for that date.
+    if (selection.current.date) loadSlots(selection.current.date, nextServiceId);
+  }
 
   // Controlled on purpose: React resets uncontrolled fields after every form
   // action, which wiped the customer's details whenever a booking failed.
@@ -163,15 +174,19 @@ export function BookingWidget({
         typeof data.service === "string" &&
         services.some((s) => s.id === data.service)
       ) {
-        setServiceId(data.service);
+        chooseService(data.service);
       }
     }
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
+    // chooseService only touches refs and state setters, so the copy from the
+    // render that subscribed stays correct.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [embed, host, services]);
 
   // ---- Slots ----------------------------------------------------------------
   async function loadSlots(nextDate: string, nextServiceId: string) {
+    selection.current.date = nextDate;
     setDate(nextDate);
     setTime("");
     setSlotsError(false);
@@ -226,6 +241,7 @@ export function BookingWidget({
 
   function bookAnother() {
     setBooked(null);
+    selection.current.date = "";
     setDate("");
     setTime("");
     setSlots([]);
@@ -287,10 +303,7 @@ export function BookingWidget({
                 key={service.id}
                 type="button"
                 aria-pressed={serviceId === service.id}
-                onClick={() => {
-                  setServiceId(service.id);
-                  if (date) loadSlots(date, service.id);
-                }}
+                onClick={() => chooseService(service.id)}
                 className={`${styles.option} px-4 py-3 text-left ${
                   serviceId === service.id
                     ? styles.serviceSelected
