@@ -68,6 +68,18 @@ describe("embedFrameAncestors", () => {
     ).toBe("frame-ancestors 'self' example.com https://*.example.org");
   });
 
+  it("allows http and https for local hosts typed without a scheme", () => {
+    // On an https BookSlot a bare "localhost:3001" would only match https,
+    // but local dev sites are plain http.
+    expect(embedFrameAncestors(["localhost:3001", "127.0.0.1:8080"])).toBe(
+      "frame-ancestors 'self' http://localhost:3001 https://localhost:3001 http://127.0.0.1:8080 https://127.0.0.1:8080",
+    );
+    expect(embedFrameAncestors(["http://localhost:3001"])).toBe(
+      "frame-ancestors 'self' http://localhost:3001",
+    );
+    expect(embedFrameAncestors(["example.com"])).toBe("frame-ancestors 'self' example.com");
+  });
+
   it("does not fall back to * when every stored entry is invalid", () => {
     // Defensive: the action never stores invalid entries, but if one slipped
     // in we should not silently open the embed to every site.
@@ -127,6 +139,27 @@ describe("plans", () => {
 describe("widgetScript", () => {
   it("is valid JavaScript", () => {
     expect(() => new Function(widgetScript("https://bookslot.example"))).not.toThrow();
+  });
+
+  it("keeps one API per BookSlot address", () => {
+    const fakeWindow: Record<string, unknown> = {
+      addEventListener() {},
+      location: { origin: "https://host.example", href: "https://host.example/" },
+    };
+    const run = (base: string) =>
+      new Function("window", "document", widgetScript(base))(fakeWindow, {
+        currentScript: null,
+      });
+
+    run("https://hosted.example");
+    run("https://self-hosted.example");
+    run("https://hosted.example");
+
+    const registry = fakeWindow.__bookslot as Record<string, { origin: string }>;
+    expect(Object.keys(registry)).toEqual(["https://hosted.example", "https://self-hosted.example"]);
+    expect(registry["https://self-hosted.example"].origin).toBe("https://self-hosted.example");
+    // The global stays the first one loaded, and reloading reuses it.
+    expect(fakeWindow.BookSlot).toBe(registry["https://hosted.example"]);
   });
 
   it("embeds the base URL as a JSON string literal", () => {
