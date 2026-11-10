@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq, gte, lte } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
 import {
@@ -20,13 +20,10 @@ import {
   verifyPassword,
   getUserByEmail,
 } from "@/lib/auth";
-import {
-  buildBookingUrl,
-  buildCancelUrl,
-  sendBookingConfirmation,
-} from "@/lib/email";
+import { getSlotsForDay, insertAppointmentIfFree } from "@/lib/booking";
+import { buildCancelUrl, sendBookingConfirmation } from "@/lib/email";
 import { newId, slugify } from "@/lib/id";
-import { parseTimeOnDate } from "@/lib/slots-internal";
+import { isValidDateString } from "@/lib/slots-internal";
 import {
   bookingSchema,
   loginSchema,
@@ -35,8 +32,6 @@ import {
   shopSettingsSchema,
   workingHourSchema,
 } from "@/lib/validation";
-import { addMinutes, parseISO } from "date-fns";
-import { fromZonedTime } from "date-fns-tz";
 
 export type ActionState = {
   error?: string;
@@ -165,6 +160,8 @@ export async function logoutAction() {
   redirect("/");
 }
 
+const SLOT_TAKEN_ERROR = "That time slot is no longer available.";
+
 export async function createBookingAction(
   _prev: ActionState,
   formData: FormData,
@@ -186,6 +183,10 @@ export async function createBookingAction(
 
   const data = parsed.data;
 
+  if (!isValidDateString(data.date)) {
+    return { error: "Please pick a valid date." };
+  }
+
   const [shop] = await db
     .select()
     .from(shops)
@@ -202,57 +203,30 @@ export async function createBookingAction(
 
   if (!service || !service.active) return { error: "Service not available." };
 
-  const date = parseISO(data.date);
-  const startsAt = parseTimeOnDate(date, data.time, shop.timezone);
-  const endsAt = addMinutes(startsAt, service.durationMinutes);
+  // Never trust the submitted time: it must be one of the slots the shop
+  // actually offers (inside working hours, in the future, on the grid).
+  const slots = await getSlotsForDay({ shop, service, date: data.date });
+  const slot = slots.find((s) => s.label === data.time);
 
-  const dayStart = fromZonedTime(
-    parseISO(`${data.date}T00:00:00`),
-    shop.timezone,
-  );
-  const dayEnd = fromZonedTime(
-    parseISO(`${data.date}T23:59:59`),
-    shop.timezone,
-  );
-
-  const dayAppointments = await db
-    .select()
-    .from(appointments)
-    .where(
-      and(
-        eq(appointments.shopId, shop.id),
-        gte(appointments.startsAt, dayStart),
-        lte(appointments.startsAt, dayEnd),
-      ),
-    );
-
-  const conflict = dayAppointments.some(
-    (a) =>
-      a.status !== "cancelled" && startsAt < a.endsAt && endsAt > a.startsAt,
-  );
-
-  if (conflict) {
-    return { error: "That time slot is no longer available." };
-  }
+  if (!slot) return { error: SLOT_TAKEN_ERROR };
 
   const cancelToken = newId("cancel");
   const appointmentId = newId("appt");
 
-  await db.insert(appointments).values({
+  const booked = await insertAppointmentIfFree({
     id: appointmentId,
     shopId: shop.id,
     serviceId: service.id,
     customerName: data.customerName,
     customerPhone: data.customerPhone,
     customerEmail: data.customerEmail || null,
-    startsAt,
-    endsAt,
-    status: "confirmed",
+    startsAt: slot.start,
+    endsAt: slot.end,
     notes: data.notes || null,
     cancelToken,
-    reminderSentAt: null,
-    createdAt: new Date(),
   });
+
+  if (!booked) return { error: SLOT_TAKEN_ERROR };
 
   if (data.customerEmail) {
     await sendBookingConfirmation({
@@ -260,8 +234,8 @@ export async function createBookingAction(
       customerName: data.customerName,
       shopName: shop.name,
       serviceName: service.name,
-      startsAt,
-      endsAt,
+      startsAt: slot.start,
+      endsAt: slot.end,
       timezone: shop.timezone,
       cancelUrl: buildCancelUrl(cancelToken),
     });
