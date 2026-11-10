@@ -65,7 +65,7 @@ export async function registerAction(
     return { error: "An account with this email already exists." };
   }
 
-  let slug = slugify(shopName);
+  let slug = slugify(shopName) || "shop";
   const [existingSlug] = await db
     .select({ slug: shops.slug })
     .from(shops)
@@ -73,7 +73,7 @@ export async function registerAction(
     .limit(1);
 
   if (existingSlug) {
-    slug = `${slug}-${newId().slice(0, 4)}`;
+    slug = `${slug}-${newId().slice(0, 4).toLowerCase()}`;
   }
 
   const userId = newId("usr");
