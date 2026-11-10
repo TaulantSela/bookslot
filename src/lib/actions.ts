@@ -1,6 +1,7 @@
 "use server";
 
 import { and, eq } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
 import {
@@ -37,6 +38,12 @@ export type ActionState = {
   error?: string;
   success?: string;
 };
+
+// Dashboard pages read straight from the database, so every dashboard
+// mutation refreshes them; otherwise the UI keeps showing the old values.
+function refreshDashboard() {
+  revalidatePath("/dashboard", "layout");
+}
 
 export async function registerAction(
   _prev: ActionState,
@@ -282,6 +289,8 @@ export async function saveServiceAction(formData: FormData) {
       sortOrder: 99,
     });
   }
+
+  refreshDashboard();
 }
 
 export async function toggleServiceAction(serviceId: string, active: boolean) {
@@ -293,6 +302,8 @@ export async function toggleServiceAction(serviceId: string, active: boolean) {
     .update(services)
     .set({ active })
     .where(and(eq(services.id, serviceId), eq(services.shopId, shop.id)));
+
+  refreshDashboard();
 }
 
 export async function saveWorkingHoursAction(formData: FormData) {
@@ -326,6 +337,8 @@ export async function saveWorkingHoursAction(formData: FormData) {
   if (entries.length > 0) {
     await db.insert(workingHours).values(entries);
   }
+
+  refreshDashboard();
 }
 
 export async function saveShopSettingsAction(formData: FormData) {
@@ -355,6 +368,8 @@ export async function saveShopSettingsAction(formData: FormData) {
       reminderHoursBefore: parsed.data.reminderHoursBefore,
     })
     .where(eq(shops.id, shop.id));
+
+  refreshDashboard();
 }
 
 export async function updateAppointmentStatusAction(
@@ -371,6 +386,8 @@ export async function updateAppointmentStatusAction(
     .where(
       and(eq(appointments.id, appointmentId), eq(appointments.shopId, shop.id)),
     );
+
+  refreshDashboard();
 }
 
 export async function getShopBySlug(slug: string) {
