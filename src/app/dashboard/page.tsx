@@ -55,7 +55,7 @@ export default async function DashboardPage() {
           <h2 className="font-medium text-zinc-900">Embed widget</h2>
           <p className="mt-1 text-sm text-zinc-600">Add to any website</p>
           <code className="mt-3 block overflow-x-auto rounded-lg bg-zinc-100 px-3 py-2 text-sm">
-            {`<script src="${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/widget.js?shop=${ctx.shop.slug}"></script>`}
+            {`<script src="${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/widget.js" data-shop="${ctx.shop.slug}" async></script>`}
           </code>
           <Link href="/dashboard/embed" className="mt-3 inline-block text-sm text-blue-600 hover:underline">
             Get embed code →

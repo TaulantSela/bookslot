@@ -37,23 +37,60 @@ Open [http://localhost:3000](http://localhost:3000)
 https://your-domain.com/book/your-shop-slug
 ```
 
-**iframe embed:**
+**One line of HTML** (mounts right after the script tag, resizes itself):
 ```html
-<iframe
-  src="https://your-domain.com/embed/your-shop-slug"
-  width="100%"
-  height="720"
-  style="border:0;border-radius:16px;max-width:480px;"
-  title="Book appointment"
-></iframe>
+<script src="https://your-domain.com/widget.js" data-shop="your-shop-slug" async></script>
 ```
 
-**Script widget** (auto-injects iframe):
+Style options (Pro): `data-primary`, `data-background`, `data-text` (hex colors), `data-radius` (0–32), `data-font` (`sans`, `system`, `serif`, `mono`), `data-scheme` (`light`, `dark`, `auto`). Also `data-height` (initial height) and `data-max-width`. The older `widget.js?shop=…` form still works.
+
+**JavaScript API**, for apps:
 ```html
-<script src="https://your-domain.com/widget.js?shop=your-shop-slug" data-height="720"></script>
+<div id="booking"></div>
+<script src="https://your-domain.com/widget.js"></script>
+<script>
+  const widget = BookSlot.mount("#booking", {
+    shop: "your-shop-slug",
+    theme: { primary: "#f5c542", scheme: "auto", radius: 8, font: "system" }, // Pro
+    service: "svc_…",                                                         // Pro: preselect
+    prefill: { name: "Ana", email: "ana@example.com", phone: "070123456" },  // Pro
+    onBooked: (booking) => console.log(booking.appointmentId, booking.when), // Pro
+  });
+  // widget.prefill({...}), widget.on("booked", fn), widget.destroy()
+</script>
 ```
+
+Events: `ready` and `resize` on every plan; `booked` and `error` on Pro. They arrive as callbacks (`onReady`, `onResize`, `onBooked`, `onError` or `widget.on(...)`) and as bubbling DOM events (`bookslot:booked`, …) on the mount element. Booking events are only posted to the origin that mounted the widget, and prefilled details travel by `postMessage`, never in the URL.
+
+**Plain iframe** (no JavaScript, no resizing or events):
+```html
+<iframe src="https://your-domain.com/embed/your-shop-slug" width="100%" height="760" style="border:0;max-width:480px" title="Book an appointment"></iframe>
+```
+
+**Allowed websites:** in **Dashboard → Widget**, owners can list the sites allowed to embed their widget (sent as CSP `frame-ancestors`). Empty means any site. Every other page refuses to be framed.
 
 Copy exact codes from **Dashboard → Widget** after signing up.
+
+## Plans
+
+Defined in `src/lib/plans.ts` and enforced on the server, so a host page can't unlock paid options by editing its embed code.
+
+| | Free | Pro |
+|---|---|---|
+| Booking page + embed, auto-resize | ✓ | ✓ |
+| Online bookings per month | 50 | Unlimited |
+| "Powered by BookSlot" badge | Shown | Hidden |
+| Theme overrides (colors, radius, font, dark mode) | — | ✓ |
+| Preselect service, prefill customer | — | ✓ |
+| `booked` / `error` events to the host page | — | ✓ |
+
+There is no payment integration: invoice the customer, then set the plan by hand.
+
+```bash
+npx tsx --env-file=.env.local scripts/set-plan.ts your-shop-slug pro
+```
+
+Check which database your env file points at before running it.
 
 ## Environment variables
 
@@ -67,6 +104,7 @@ See `.env.example`:
 | `RESEND_API_KEY` | Optional | Send confirmation & reminder emails |
 | `EMAIL_FROM` | Optional | Sender address for Resend |
 | `CRON_SECRET` | Production | Protects `/api/cron/reminders` |
+| `NEXT_PUBLIC_SALES_EMAIL` | Optional | Shown on the dashboard as the "ask us to upgrade" link |
 
 Without `RESEND_API_KEY`, emails are logged to the console (fine for development).
 
