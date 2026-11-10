@@ -25,7 +25,7 @@ export function ClinicSite({
     <div className={styles.site}>
       <header className={styles.topbar}>
         <span className={styles.logo}>
-          <span className={styles.logoMark}>B</span> Buzëqeshja Dental
+          <span className={styles.logoMark}>B</span> Bright Smile Dental
         </span>
         <nav className={styles.nav}>
           <a href="#book">Book</a>
@@ -43,7 +43,7 @@ export function ClinicSite({
       <BookingSection patient={patient} bookslotUrl={bookslotUrl} />
 
       <footer id="contact" className={styles.footer}>
-        Buzëqeshja Dental Clinic · Struga · +389 70 333 444
+        Bright Smile Dental · Struga · +389 70 333 444
       </footer>
     </div>
   );

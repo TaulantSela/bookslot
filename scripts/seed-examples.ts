@@ -32,8 +32,8 @@ const EXAMPLES: ExampleShop[] = [
   {
     owner: { email: "barber@example.com", name: "Arbër Rexhepi" },
     shop: {
-      slug: "berberi-liqeni",
-      name: "Berberi Liqeni",
+      slug: "lakeside-barbers",
+      name: "Lakeside Barbers",
       description: "Classic cuts and hot-towel shaves",
       primaryColor: "#b45309",
       phone: "+389 70 111 222",
@@ -42,9 +42,9 @@ const EXAMPLES: ExampleShop[] = [
       embedDomains: null,
     },
     services: [
-      { id: "svc_liqeni_haircut", name: "Haircut", durationMinutes: 30, price: 600 },
-      { id: "svc_liqeni_beard", name: "Beard trim", durationMinutes: 20, price: 300 },
-      { id: "svc_liqeni_combo", name: "Haircut + beard", durationMinutes: 45, price: 800 },
+      { id: "svc_lakeside_haircut", name: "Haircut", durationMinutes: 30, price: 600 },
+      { id: "svc_lakeside_beard", name: "Beard trim", durationMinutes: 20, price: 300 },
+      { id: "svc_lakeside_combo", name: "Haircut + beard", durationMinutes: 45, price: 800 },
     ],
     days: [2, 3, 4, 5, 6],
     hours: ["09:00", "19:00"],
@@ -52,8 +52,8 @@ const EXAMPLES: ExampleShop[] = [
   {
     owner: { email: "dental@example.com", name: "Dr. Besa Osmani" },
     shop: {
-      slug: "buzeqeshja-dental",
-      name: "Buzëqeshja Dental Clinic",
+      slug: "bright-smile-dental",
+      name: "Bright Smile Dental",
       description: "Family dentistry",
       primaryColor: "#0d9488",
       phone: "+389 70 333 444",
@@ -63,9 +63,9 @@ const EXAMPLES: ExampleShop[] = [
       embedDomains: ["localhost:3001"],
     },
     services: [
-      { id: "svc_buzeqeshja_checkup", name: "Check-up & cleaning", durationMinutes: 45, price: 1500 },
-      { id: "svc_buzeqeshja_consult", name: "Consultation", durationMinutes: 30, price: 800 },
-      { id: "svc_buzeqeshja_whitening", name: "Teeth whitening", durationMinutes: 60, price: 6000 },
+      { id: "svc_brightsmile_checkup", name: "Check-up & cleaning", durationMinutes: 45, price: 1500 },
+      { id: "svc_brightsmile_consult", name: "Consultation", durationMinutes: 30, price: 800 },
+      { id: "svc_brightsmile_whitening", name: "Teeth whitening", durationMinutes: 60, price: 6000 },
     ],
     days: [1, 2, 3, 4, 5],
     hours: ["08:00", "16:00"],

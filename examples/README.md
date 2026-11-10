@@ -4,8 +4,8 @@ Two small websites that embed BookSlot, one per plan. BookSlot also serves both 
 
 | | Site | Plan | Integration | Live in the demo |
 |---|---|---|---|---|
-| [`html-free/`](html-free/index.html) | Berberi Liqeni (barbershop) | Free | One `<script>` tag | `/demo/barbershop` |
-| [`nextjs-pro/`](nextjs-pro/app/bookslot-widget.tsx) | Buzëqeshja Dental Clinic | Pro | React component around `BookSlot.mount` | `/demo/dental` |
+| [`html-free/`](html-free/index.html) | Lakeside Barbers | Free | One `<script>` tag | `/demo/barbershop` |
+| [`nextjs-pro/`](nextjs-pro/app/bookslot-widget.tsx) | Bright Smile Dental | Pro | React component around `BookSlot.mount` | `/demo/dental` |
 
 The Free site gets the widget in the shop's dashboard colour, with the "Powered by BookSlot" badge, resizing to fit.
 
