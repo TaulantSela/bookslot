@@ -252,11 +252,14 @@ export async function saveServiceAction(formData: FormData) {
   const parsed = serviceSchema.safeParse({
     name: formData.get("name"),
     durationMinutes: formData.get("durationMinutes"),
-    priceCents: formData.get("priceCents") || undefined,
+    price: formData.get("price") || undefined,
   });
 
   if (!parsed.success) return;
 
+  // The form takes whole currency units (e.g. 800 MKD); the database stores cents.
+  const priceCents =
+    parsed.data.price == null ? null : Math.round(parsed.data.price * 100);
   const serviceId = formData.get("serviceId") as string | null;
 
   if (serviceId) {
@@ -265,7 +268,7 @@ export async function saveServiceAction(formData: FormData) {
       .set({
         name: parsed.data.name,
         durationMinutes: parsed.data.durationMinutes,
-        priceCents: parsed.data.priceCents ?? null,
+        priceCents,
       })
       .where(and(eq(services.id, serviceId), eq(services.shopId, shop.id)));
   } else {
@@ -274,7 +277,7 @@ export async function saveServiceAction(formData: FormData) {
       shopId: shop.id,
       name: parsed.data.name,
       durationMinutes: parsed.data.durationMinutes,
-      priceCents: parsed.data.priceCents ?? null,
+      priceCents,
       active: true,
       sortOrder: 99,
     });

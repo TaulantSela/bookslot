@@ -65,8 +65,8 @@ export default async function ServicesPage() {
             <Input id="durationMinutes" name="durationMinutes" type="number" defaultValue={30} required />
           </div>
           <div>
-            <Label htmlFor="priceCents">Price in MKD (optional)</Label>
-            <Input id="priceCents" name="priceCents" type="number" placeholder="800" />
+            <Label htmlFor="price">Price in MKD (optional)</Label>
+            <Input id="price" name="price" type="number" min={0} step="any" placeholder="800" />
           </div>
           <div className="md:col-span-3">
             <Button type="submit">Add service</Button>

@@ -15,7 +15,8 @@ export const loginSchema = z.object({
 export const serviceSchema = z.object({
   name: z.string().min(1).max(80),
   durationMinutes: z.coerce.number().int().min(5).max(480),
-  priceCents: z.coerce.number().int().min(0).optional(),
+  /** Whole currency units as typed by the owner (e.g. 800 MKD), not cents. */
+  price: z.coerce.number().min(0).max(10_000_000).optional(),
 });
 
 export const workingHourSchema = z.object({
