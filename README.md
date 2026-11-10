@@ -109,6 +109,7 @@ src/
 | `npm run build` | Migrate DB + production build |
 | `npm run db:setup` | Migrate + seed demo data |
 | `npm run db:seed` | Seed demo shop only |
+| `npm test` | Unit tests (slot engine, slugs, email escaping) and booking integration tests on a throwaway SQLite file |
 
 ## Roadmap (not in v1)
 
