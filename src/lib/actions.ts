@@ -270,24 +270,6 @@ export async function createBookingAction(
   redirect(`/book/${shop.slug}/success?appt=${appointmentId}`);
 }
 
-export async function cancelAppointmentAction(cancelToken: string) {
-  const [appt] = await db
-    .select()
-    .from(appointments)
-    .where(eq(appointments.cancelToken, cancelToken))
-    .limit(1);
-
-  if (!appt) return { error: "Appointment not found." };
-  if (appt.status === "cancelled") return { success: "Already cancelled." };
-
-  await db
-    .update(appointments)
-    .set({ status: "cancelled" })
-    .where(eq(appointments.id, appt.id));
-
-  return { success: "Appointment cancelled." };
-}
-
 export async function saveServiceAction(formData: FormData) {
   const session = await getSession();
   if (!session) redirect("/login");
@@ -428,12 +410,4 @@ export async function getDashboardContext() {
   if (!session) return null;
   const shop = await getUserShop(session.userId);
   return { session, shop };
-}
-
-export async function confirmCancelAction(cancelToken: string) {
-  const result = await cancelAppointmentAction(cancelToken);
-  if ("error" in result && result.error) {
-    return result;
-  }
-  redirect(`/cancel/${cancelToken}/done`);
 }
