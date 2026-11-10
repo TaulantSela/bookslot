@@ -1,4 +1,7 @@
+import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
+import { db } from "@/db";
+import { services } from "@/db/schema";
 import { Card } from "@/components/ui";
 import { EmbedDomainsForm } from "@/components/embed-domains-form";
 import { getDashboardContext } from "@/lib/actions";
@@ -35,6 +38,11 @@ export default async function EmbedPage() {
   const plan = entitlementsFor(shop.plan);
   const isPro = shop.plan === "pro";
   const used = await monthlyBookingCount(shop);
+  const serviceList = await db
+    .select({ id: services.id, name: services.name, active: services.active })
+    .from(services)
+    .where(eq(services.shopId, shop.id))
+    .orderBy(services.sortOrder);
   const salesEmail = process.env.NEXT_PUBLIC_SALES_EMAIL;
   const proTag = isPro ? "" : " (Pro)";
 
@@ -171,6 +179,28 @@ export function Booking({ user }) {
         note="Mount in an effect and destroy on unmount."
         code={reactCode}
       />
+      <Card>
+        <h2 className="font-medium text-zinc-900">Service IDs{proTag}</h2>
+        <p className="mt-1 text-sm text-zinc-600">
+          Pass one as <code>service</code> (or <code>data-service</code>) to open the widget on that service.
+        </p>
+        {serviceList.length ? (
+          <ul className="mt-3 divide-y divide-zinc-100 text-sm">
+            {serviceList.map((s) => (
+              <li key={s.id} className="flex items-center justify-between gap-4 py-2">
+                <span className={s.active ? "text-zinc-800" : "text-zinc-400"}>
+                  {s.name}
+                  {s.active ? "" : " (hidden)"}
+                </span>
+                <code className="rounded bg-zinc-100 px-2 py-0.5 text-xs">{s.id}</code>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-3 text-sm text-zinc-500">Add services first.</p>
+        )}
+      </Card>
+
       <Snippet
         title="5 · Plain iframe"
         note="No JavaScript at all. It won't resize itself or send events."
