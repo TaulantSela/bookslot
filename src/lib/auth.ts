@@ -6,9 +6,24 @@ import { db } from "@/db";
 import { shops, users } from "@/db/schema";
 
 const COOKIE_NAME = "bookslot_session";
-const secret = new TextEncoder().encode(
-  process.env.AUTH_SECRET ?? "dev-secret-change-in-production-min-32-chars!!",
-);
+const DEV_ONLY_SECRET = "dev-secret-change-in-production-min-32-chars!!";
+
+let cachedSecret: Uint8Array | null = null;
+
+// Resolved lazily so builds don't need the variable, but a production server
+// without AUTH_SECRET refuses to sign or verify sessions instead of silently
+// using a public fallback that would let anyone forge a login.
+function getSecret() {
+  if (cachedSecret) return cachedSecret;
+
+  const value = process.env.AUTH_SECRET;
+  if (!value && process.env.NODE_ENV === "production") {
+    throw new Error("AUTH_SECRET must be set in production.");
+  }
+
+  cachedSecret = new TextEncoder().encode(value || DEV_ONLY_SECRET);
+  return cachedSecret;
+}
 
 export type SessionPayload = {
   userId: string;
@@ -29,7 +44,7 @@ export async function createSession(payload: SessionPayload) {
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("30d")
-    .sign(secret);
+    .sign(getSecret());
 
   const cookieStore = await cookies();
   cookieStore.set(COOKIE_NAME, token, {
@@ -51,6 +66,7 @@ export async function getSession(): Promise<SessionPayload | null> {
   const token = cookieStore.get(COOKIE_NAME)?.value;
   if (!token) return null;
 
+  const secret = getSecret();
   try {
     const { payload } = await jwtVerify(token, secret);
     return payload as unknown as SessionPayload;

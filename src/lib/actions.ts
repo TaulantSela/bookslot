@@ -1,6 +1,7 @@
 "use server";
 
-import { and, eq, gte, lte } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
 import {
@@ -20,13 +21,10 @@ import {
   verifyPassword,
   getUserByEmail,
 } from "@/lib/auth";
-import {
-  buildBookingUrl,
-  buildCancelUrl,
-  sendBookingConfirmation,
-} from "@/lib/email";
+import { getSlotsForDay, insertAppointmentIfFree } from "@/lib/booking";
+import { buildCancelUrl, sendBookingConfirmation } from "@/lib/email";
 import { newId, slugify } from "@/lib/id";
-import { parseTimeOnDate } from "@/lib/slots-internal";
+import { isValidDateString } from "@/lib/slots-internal";
 import {
   bookingSchema,
   loginSchema,
@@ -35,13 +33,17 @@ import {
   shopSettingsSchema,
   workingHourSchema,
 } from "@/lib/validation";
-import { addMinutes, parseISO } from "date-fns";
-import { fromZonedTime } from "date-fns-tz";
 
 export type ActionState = {
   error?: string;
   success?: string;
 };
+
+// Dashboard pages read straight from the database, so every dashboard
+// mutation refreshes them; otherwise the UI keeps showing the old values.
+function refreshDashboard() {
+  revalidatePath("/dashboard", "layout");
+}
 
 export async function registerAction(
   _prev: ActionState,
@@ -65,7 +67,7 @@ export async function registerAction(
     return { error: "An account with this email already exists." };
   }
 
-  let slug = slugify(shopName);
+  let slug = slugify(shopName) || "shop";
   const [existingSlug] = await db
     .select({ slug: shops.slug })
     .from(shops)
@@ -73,7 +75,7 @@ export async function registerAction(
     .limit(1);
 
   if (existingSlug) {
-    slug = `${slug}-${newId().slice(0, 4)}`;
+    slug = `${slug}-${newId().slice(0, 4).toLowerCase()}`;
   }
 
   const userId = newId("usr");
@@ -165,6 +167,8 @@ export async function logoutAction() {
   redirect("/");
 }
 
+const SLOT_TAKEN_ERROR = "That time slot is no longer available.";
+
 export async function createBookingAction(
   _prev: ActionState,
   formData: FormData,
@@ -186,6 +190,10 @@ export async function createBookingAction(
 
   const data = parsed.data;
 
+  if (!isValidDateString(data.date)) {
+    return { error: "Please pick a valid date." };
+  }
+
   const [shop] = await db
     .select()
     .from(shops)
@@ -202,57 +210,30 @@ export async function createBookingAction(
 
   if (!service || !service.active) return { error: "Service not available." };
 
-  const date = parseISO(data.date);
-  const startsAt = parseTimeOnDate(date, data.time, shop.timezone);
-  const endsAt = addMinutes(startsAt, service.durationMinutes);
+  // Never trust the submitted time: it must be one of the slots the shop
+  // actually offers (inside working hours, in the future, on the grid).
+  const slots = await getSlotsForDay({ shop, service, date: data.date });
+  const slot = slots.find((s) => s.label === data.time);
 
-  const dayStart = fromZonedTime(
-    parseISO(`${data.date}T00:00:00`),
-    shop.timezone,
-  );
-  const dayEnd = fromZonedTime(
-    parseISO(`${data.date}T23:59:59`),
-    shop.timezone,
-  );
-
-  const dayAppointments = await db
-    .select()
-    .from(appointments)
-    .where(
-      and(
-        eq(appointments.shopId, shop.id),
-        gte(appointments.startsAt, dayStart),
-        lte(appointments.startsAt, dayEnd),
-      ),
-    );
-
-  const conflict = dayAppointments.some(
-    (a) =>
-      a.status !== "cancelled" && startsAt < a.endsAt && endsAt > a.startsAt,
-  );
-
-  if (conflict) {
-    return { error: "That time slot is no longer available." };
-  }
+  if (!slot) return { error: SLOT_TAKEN_ERROR };
 
   const cancelToken = newId("cancel");
   const appointmentId = newId("appt");
 
-  await db.insert(appointments).values({
+  const booked = await insertAppointmentIfFree({
     id: appointmentId,
     shopId: shop.id,
     serviceId: service.id,
     customerName: data.customerName,
     customerPhone: data.customerPhone,
     customerEmail: data.customerEmail || null,
-    startsAt,
-    endsAt,
-    status: "confirmed",
+    startsAt: slot.start,
+    endsAt: slot.end,
     notes: data.notes || null,
     cancelToken,
-    reminderSentAt: null,
-    createdAt: new Date(),
   });
+
+  if (!booked) return { error: SLOT_TAKEN_ERROR };
 
   if (data.customerEmail) {
     await sendBookingConfirmation({
@@ -260,32 +241,14 @@ export async function createBookingAction(
       customerName: data.customerName,
       shopName: shop.name,
       serviceName: service.name,
-      startsAt,
-      endsAt,
+      startsAt: slot.start,
+      endsAt: slot.end,
       timezone: shop.timezone,
       cancelUrl: buildCancelUrl(cancelToken),
     });
   }
 
   redirect(`/book/${shop.slug}/success?appt=${appointmentId}`);
-}
-
-export async function cancelAppointmentAction(cancelToken: string) {
-  const [appt] = await db
-    .select()
-    .from(appointments)
-    .where(eq(appointments.cancelToken, cancelToken))
-    .limit(1);
-
-  if (!appt) return { error: "Appointment not found." };
-  if (appt.status === "cancelled") return { success: "Already cancelled." };
-
-  await db
-    .update(appointments)
-    .set({ status: "cancelled" })
-    .where(eq(appointments.id, appt.id));
-
-  return { success: "Appointment cancelled." };
 }
 
 export async function saveServiceAction(formData: FormData) {
@@ -296,11 +259,14 @@ export async function saveServiceAction(formData: FormData) {
   const parsed = serviceSchema.safeParse({
     name: formData.get("name"),
     durationMinutes: formData.get("durationMinutes"),
-    priceCents: formData.get("priceCents") || undefined,
+    price: formData.get("price") || undefined,
   });
 
   if (!parsed.success) return;
 
+  // The form takes whole currency units (e.g. 800 MKD); the database stores cents.
+  const priceCents =
+    parsed.data.price == null ? null : Math.round(parsed.data.price * 100);
   const serviceId = formData.get("serviceId") as string | null;
 
   if (serviceId) {
@@ -309,7 +275,7 @@ export async function saveServiceAction(formData: FormData) {
       .set({
         name: parsed.data.name,
         durationMinutes: parsed.data.durationMinutes,
-        priceCents: parsed.data.priceCents ?? null,
+        priceCents,
       })
       .where(and(eq(services.id, serviceId), eq(services.shopId, shop.id)));
   } else {
@@ -318,11 +284,13 @@ export async function saveServiceAction(formData: FormData) {
       shopId: shop.id,
       name: parsed.data.name,
       durationMinutes: parsed.data.durationMinutes,
-      priceCents: parsed.data.priceCents ?? null,
+      priceCents,
       active: true,
       sortOrder: 99,
     });
   }
+
+  refreshDashboard();
 }
 
 export async function toggleServiceAction(serviceId: string, active: boolean) {
@@ -334,6 +302,8 @@ export async function toggleServiceAction(serviceId: string, active: boolean) {
     .update(services)
     .set({ active })
     .where(and(eq(services.id, serviceId), eq(services.shopId, shop.id)));
+
+  refreshDashboard();
 }
 
 export async function saveWorkingHoursAction(formData: FormData) {
@@ -367,6 +337,8 @@ export async function saveWorkingHoursAction(formData: FormData) {
   if (entries.length > 0) {
     await db.insert(workingHours).values(entries);
   }
+
+  refreshDashboard();
 }
 
 export async function saveShopSettingsAction(formData: FormData) {
@@ -396,6 +368,8 @@ export async function saveShopSettingsAction(formData: FormData) {
       reminderHoursBefore: parsed.data.reminderHoursBefore,
     })
     .where(eq(shops.id, shop.id));
+
+  refreshDashboard();
 }
 
 export async function updateAppointmentStatusAction(
@@ -412,6 +386,8 @@ export async function updateAppointmentStatusAction(
     .where(
       and(eq(appointments.id, appointmentId), eq(appointments.shopId, shop.id)),
     );
+
+  refreshDashboard();
 }
 
 export async function getShopBySlug(slug: string) {
@@ -428,12 +404,4 @@ export async function getDashboardContext() {
   if (!session) return null;
   const shop = await getUserShop(session.userId);
   return { session, shop };
-}
-
-export async function confirmCancelAction(cancelToken: string) {
-  const result = await cancelAppointmentAction(cancelToken);
-  if ("error" in result && result.error) {
-    return result;
-  }
-  redirect(`/cancel/${cancelToken}/done`);
 }

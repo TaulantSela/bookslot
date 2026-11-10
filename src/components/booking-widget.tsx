@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useRef, useState } from "react";
 import { createBookingAction, type ActionState } from "@/lib/actions";
 import { Button, Input, Label, Textarea } from "@/components/ui";
 import { formatPrice } from "@/lib/utils";
@@ -17,6 +17,7 @@ type Props = {
   shopSlug: string;
   shopName: string;
   primaryColor: string;
+  timezone: string;
   services: Service[];
   embed?: boolean;
 };
@@ -25,6 +26,7 @@ export function BookingWidget({
   shopSlug,
   shopName,
   primaryColor,
+  timezone,
   services,
   embed = false,
 }: Props) {
@@ -33,17 +35,28 @@ export function BookingWidget({
   const [time, setTime] = useState("");
   const [slots, setSlots] = useState<string[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
+  const [slotsError, setSlotsError] = useState(false);
+  const latestSlotsRequest = useRef(0);
 
-  const [state, formAction, pending] = useActionState<ActionState, FormData>(
-    createBookingAction,
-    {},
-  );
+  // Controlled on purpose: React resets uncontrolled fields after every form
+  // action, which wiped the customer's details whenever a booking failed.
+  const [customer, setCustomer] = useState({
+    customerName: "",
+    customerPhone: "",
+    customerEmail: "",
+    notes: "",
+  });
 
-  const selectedService = services.find((s) => s.id === serviceId);
+  function updateCustomer(field: keyof typeof customer, value: string) {
+    setCustomer((prev) => ({ ...prev, [field]: value }));
+  }
 
   async function loadSlots(nextDate: string, nextServiceId: string) {
     setDate(nextDate);
     setTime("");
+    setSlotsError(false);
+    const requestId = ++latestSlotsRequest.current;
+
     if (!nextDate || !nextServiceId) {
       setSlots([]);
       return;
@@ -51,17 +64,43 @@ export function BookingWidget({
 
     setLoadingSlots(true);
     try {
-      const res = await fetch(
-        `/api/availability?slug=${shopSlug}&serviceId=${nextServiceId}&date=${nextDate}`,
-      );
-      const data = await res.json();
-      setSlots(data.slots ?? []);
+      const params = new URLSearchParams({
+        slug: shopSlug,
+        serviceId: nextServiceId,
+        date: nextDate,
+      });
+      const res = await fetch(`/api/availability?${params}`);
+      if (!res.ok) throw new Error(`Availability request failed: ${res.status}`);
+      const data: { slots?: string[] } = await res.json();
+      // Ignore responses for a date or service the customer has since changed.
+      if (requestId === latestSlotsRequest.current) setSlots(data.slots ?? []);
+    } catch {
+      if (requestId === latestSlotsRequest.current) {
+        setSlots([]);
+        setSlotsError(true);
+      }
     } finally {
-      setLoadingSlots(false);
+      if (requestId === latestSlotsRequest.current) setLoadingSlots(false);
     }
   }
 
-  const minDate = formatInTimeZone(new Date(), "Europe/Skopje", "yyyy-MM-dd");
+  const [state, formAction, pending] = useActionState<ActionState, FormData>(
+    async (prev, formData) => {
+      const result = await createBookingAction(prev, formData);
+      // A failed booking usually means the slot was just taken: refresh the
+      // list so the customer doesn't keep picking an unavailable time.
+      if (result?.error) {
+        void loadSlots(
+          String(formData.get("date") ?? ""),
+          String(formData.get("serviceId") ?? ""),
+        );
+      }
+      return result ?? {};
+    },
+    {},
+  );
+
+  const minDate = formatInTimeZone(new Date(), timezone, "yyyy-MM-dd");
 
   return (
     <div className={embed ? "p-4" : "mx-auto max-w-lg py-8"}>
@@ -128,6 +167,10 @@ export function BookingWidget({
           <Label>Time</Label>
           {loadingSlots ? (
             <p className="text-sm text-zinc-500">Loading available times…</p>
+          ) : slotsError ? (
+            <p className="text-sm text-red-700">
+              Couldn&apos;t load available times. Please try again.
+            </p>
           ) : slots.length === 0 ? (
             <p className="text-sm text-zinc-500">
               {date ? "No available times on this day." : "Pick a date first."}
@@ -157,22 +200,47 @@ export function BookingWidget({
 
         <div>
           <Label htmlFor="customerName">Your name</Label>
-          <Input id="customerName" name="customerName" required />
+          <Input
+            id="customerName"
+            name="customerName"
+            value={customer.customerName}
+            onChange={(e) => updateCustomer("customerName", e.target.value)}
+            required
+          />
         </div>
 
         <div>
           <Label htmlFor="customerPhone">Phone (for reminders)</Label>
-          <Input id="customerPhone" name="customerPhone" type="tel" required />
+          <Input
+            id="customerPhone"
+            name="customerPhone"
+            type="tel"
+            value={customer.customerPhone}
+            onChange={(e) => updateCustomer("customerPhone", e.target.value)}
+            required
+          />
         </div>
 
         <div>
           <Label htmlFor="customerEmail">Email (optional)</Label>
-          <Input id="customerEmail" name="customerEmail" type="email" />
+          <Input
+            id="customerEmail"
+            name="customerEmail"
+            type="email"
+            value={customer.customerEmail}
+            onChange={(e) => updateCustomer("customerEmail", e.target.value)}
+          />
         </div>
 
         <div>
           <Label htmlFor="notes">Notes (optional)</Label>
-          <Textarea id="notes" name="notes" rows={3} />
+          <Textarea
+            id="notes"
+            name="notes"
+            rows={3}
+            value={customer.notes}
+            onChange={(e) => updateCustomer("notes", e.target.value)}
+          />
         </div>
 
         {state.error && (

@@ -1,7 +1,7 @@
 import { addDays, addMinutes, isAfter, startOfDay } from "date-fns";
-import { formatInTimeZone, toZonedTime } from "date-fns-tz";
+import { formatInTimeZone } from "date-fns-tz";
 import type { Appointment, Service, WorkingHour } from "@/db/schema";
-import { parseTimeOnDate } from "@/lib/slots-internal";
+import { dayOfWeek, zonedDateTime } from "@/lib/slots-internal";
 
 export type TimeSlot = {
   start: Date;
@@ -15,28 +15,29 @@ export function getAvailableSlots({
   workingHours,
   service,
   appointments,
+  now = new Date(),
   slotIntervalMinutes = 15,
 }: {
-  date: Date;
+  /** Calendar date in the shop's timezone, as yyyy-MM-dd. */
+  date: string;
   timezone: string;
   workingHours: WorkingHour[];
-  service: Service;
+  service: Pick<Service, "durationMinutes">;
   appointments: Pick<Appointment, "startsAt" | "endsAt" | "status">[];
+  now?: Date;
   slotIntervalMinutes?: number;
 }): TimeSlot[] {
-  const zonedDate = toZonedTime(date, timezone);
-  const dayOfWeek = zonedDate.getDay();
-  const dayHours = workingHours.filter((h) => h.dayOfWeek === dayOfWeek);
+  const weekday = dayOfWeek(date);
+  const dayHours = workingHours.filter((h) => h.dayOfWeek === weekday);
 
   if (dayHours.length === 0) return [];
 
-  const now = new Date();
   const slots: TimeSlot[] = [];
   const duration = service.durationMinutes;
 
   for (const hours of dayHours) {
-    let cursor = parseTimeOnDate(date, hours.startTime, timezone);
-    const dayEnd = parseTimeOnDate(date, hours.endTime, timezone);
+    let cursor = zonedDateTime(date, hours.startTime, timezone);
+    const dayEnd = zonedDateTime(date, hours.endTime, timezone);
 
     while (addMinutes(cursor, duration) <= dayEnd) {
       const slotEnd = addMinutes(cursor, duration);
