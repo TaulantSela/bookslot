@@ -39,6 +39,7 @@ export default async function BookPage({
         shopSlug={shop.slug}
         shopName={shop.name}
         primaryColor={shop.primaryColor}
+        timezone={shop.timezone}
         services={activeServices}
       />
     </main>
