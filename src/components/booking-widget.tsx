@@ -51,6 +51,8 @@ type Props = {
   /** False once a free plan's monthly booking limit is reached. */
   bookingOpen?: boolean;
   closedMessage?: string;
+  /** Which form fields to show (src/lib/booking-form.ts). */
+  fields?: WidgetFields;
   /** People customers can book with. Empty = the shop is one calendar. */
   staff?: StaffOption[];
   /** What staff are called, e.g. "Barber". */
@@ -65,6 +67,120 @@ type Props = {
   badgeHref?: string;
   host?: HostBridge;
 };
+
+export type WidgetQuestion = {
+  key: string;
+  label: string;
+  type: string;
+  required: boolean;
+  options: string[] | null;
+  helpText: string | null;
+};
+
+export type WidgetFields = {
+  phone: "required" | "optional" | "hidden";
+  email: "required" | "optional" | "hidden";
+  notes: "required" | "optional" | "hidden";
+  custom: WidgetQuestion[];
+};
+
+const DEFAULT_FIELDS: WidgetFields = {
+  phone: "required",
+  email: "optional",
+  notes: "optional",
+  custom: [],
+};
+
+type Answer = string | boolean;
+
+/** One custom question. Named field_<key> so the server can find it. */
+function CustomQuestion({
+  field,
+  value,
+  onChange,
+}: {
+  field: WidgetQuestion;
+  value: Answer | undefined;
+  onChange: (value: Answer) => void;
+}) {
+  const id = `field_${field.key}`;
+  const hint = field.helpText ? <p className={`mt-1 ${styles.muted}`}>{field.helpText}</p> : null;
+  const label = (
+    <>
+      {field.label}
+      {field.required ? "" : " (optional)"}
+    </>
+  );
+
+  if (field.type === "checkbox") {
+    return (
+      <div>
+        <label className="flex items-start gap-2 text-sm text-[var(--bs-text)]">
+          <input
+            type="checkbox"
+            name={id}
+            checked={value === true}
+            onChange={(e) => onChange(e.target.checked)}
+            required={field.required}
+            className="mt-0.5 accent-[var(--bs-primary)]"
+          />
+          <span>{label}</span>
+        </label>
+        {hint}
+      </div>
+    );
+  }
+
+  const text = typeof value === "string" ? value : "";
+  return (
+    <div>
+      <label htmlFor={id} className={styles.label}>
+        {label}
+      </label>
+      {field.type === "select" ? (
+        <select
+          id={id}
+          name={id}
+          value={text}
+          onChange={(e) => onChange(e.target.value)}
+          required={field.required}
+          className={styles.field}
+        >
+          <option value="">Choose…</option>
+          {(field.options ?? []).map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+      ) : field.type === "textarea" ? (
+        <textarea
+          id={id}
+          name={id}
+          rows={3}
+          maxLength={2000}
+          value={text}
+          onChange={(e) => onChange(e.target.value)}
+          required={field.required}
+          className={styles.field}
+        />
+      ) : (
+        <input
+          id={id}
+          name={id}
+          type={field.type === "number" ? "number" : field.type === "date" ? "date" : "text"}
+          step={field.type === "number" ? "any" : undefined}
+          maxLength={field.type === "text" ? 200 : undefined}
+          value={text}
+          onChange={(e) => onChange(e.target.value)}
+          required={field.required}
+          className={styles.field}
+        />
+      )}
+      {hint}
+    </div>
+  );
+}
 
 const EMPTY_CUSTOMER = {
   customerName: "",
@@ -104,6 +220,7 @@ export function BookingWidget({
   timezone,
   services,
   lastBookableDate,
+  fields = DEFAULT_FIELDS,
   staff = [],
   staffLabel = "Staff member",
   staffChoice = "choose",
@@ -160,6 +277,7 @@ export function BookingWidget({
   // Controlled on purpose: React resets uncontrolled fields after every form
   // action, which wiped the customer's details whenever a booking failed.
   const [customer, setCustomer] = useState(EMPTY_CUSTOMER);
+  const [answers, setAnswers] = useState<Record<string, Answer>>({});
 
   function updateCustomer(field: keyof typeof customer, value: string) {
     setCustomer((prev) => ({ ...prev, [field]: value }));
@@ -216,6 +334,18 @@ export function BookingWidget({
         customerEmail: clip(incoming.email, 120) ?? prev.customerEmail,
         notes: clip(incoming.notes, 500) ?? prev.notes,
       }));
+      // Answers to custom questions, keyed by question key.
+      if (incoming.fields && typeof incoming.fields === "object") {
+        const known = new Map(fields.custom.map((f) => [f.key, f]));
+        const next: Record<string, Answer> = {};
+        for (const [key, raw] of Object.entries(incoming.fields as Record<string, unknown>)) {
+          const field = known.get(key);
+          if (!field) continue;
+          if (field.type === "checkbox") next[key] = raw === true;
+          else if (typeof raw === "string" || typeof raw === "number") next[key] = String(raw).slice(0, 2000);
+        }
+        setAnswers((prev) => ({ ...prev, ...next }));
+      }
       if (
         typeof data.service === "string" &&
         services.some((s) => s.id === data.service)
@@ -235,7 +365,7 @@ export function BookingWidget({
     // chooseService only touches refs and state setters, so the copy from the
     // render that subscribed stays correct.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [embed, host, services, staff, staffChoice]);
+  }, [embed, host, services, staff, staffChoice, fields]);
 
   // ---- Slots ----------------------------------------------------------------
   /** Loads times for a date, for the currently selected service and staff member. */
@@ -304,6 +434,7 @@ export function BookingWidget({
     setSlots([]);
     setClosedDay(null);
     setCustomer((prev) => ({ ...prev, notes: "" }));
+    setAnswers({});
   }
 
   const minDate = formatInTimeZone(new Date(), timezone, "yyyy-MM-dd");
@@ -469,50 +600,68 @@ export function BookingWidget({
           />
         </div>
 
-        <div>
-          <label htmlFor="customerPhone" className={styles.label}>
-            Phone (for reminders)
-          </label>
-          <input
-            id="customerPhone"
-            name="customerPhone"
-            type="tel"
-            autoComplete="tel"
-            value={customer.customerPhone}
-            onChange={(e) => updateCustomer("customerPhone", e.target.value)}
-            required
-            className={styles.field}
-          />
-        </div>
+        {fields.phone !== "hidden" && (
+          <div>
+            <label htmlFor="customerPhone" className={styles.label}>
+              Phone{fields.phone === "optional" ? " (optional)" : ""}
+            </label>
+            <input
+              id="customerPhone"
+              name="customerPhone"
+              type="tel"
+              autoComplete="tel"
+              value={customer.customerPhone}
+              onChange={(e) => updateCustomer("customerPhone", e.target.value)}
+              required={fields.phone === "required"}
+              className={styles.field}
+            />
+          </div>
+        )}
 
-        <div>
-          <label htmlFor="customerEmail" className={styles.label}>
-            Email (optional)
-          </label>
-          <input
-            id="customerEmail"
-            name="customerEmail"
-            type="email"
-            autoComplete="email"
-            value={customer.customerEmail}
-            onChange={(e) => updateCustomer("customerEmail", e.target.value)}
-            className={styles.field}
-          />
-        </div>
+        {fields.email !== "hidden" && (
+          <div>
+            <label htmlFor="customerEmail" className={styles.label}>
+              Email{fields.email === "optional" ? " (optional)" : ""}
+            </label>
+            <input
+              id="customerEmail"
+              name="customerEmail"
+              type="email"
+              autoComplete="email"
+              value={customer.customerEmail}
+              onChange={(e) => updateCustomer("customerEmail", e.target.value)}
+              required={fields.email === "required"}
+              className={styles.field}
+            />
+          </div>
+        )}
 
-        <div>
-          <label htmlFor="notes" className={styles.label}>
-            Notes (optional)
-          </label>
-          <textarea
-            id="notes"
-            name="notes"
-            rows={3}
-            value={customer.notes}
-            onChange={(e) => updateCustomer("notes", e.target.value)}
-            className={styles.field}
+        {fields.custom.map((field) => (
+          <CustomQuestion
+            key={field.key}
+            field={field}
+            value={answers[field.key]}
+            onChange={(value) => setAnswers((prev) => ({ ...prev, [field.key]: value }))}
           />
-        </div>
+        ))}
+
+        {fields.notes !== "hidden" && (
+          <div>
+            <label htmlFor="notes" className={styles.label}>
+              Notes{fields.notes === "optional" ? " (optional)" : ""}
+            </label>
+            <textarea
+              id="notes"
+              name="notes"
+              rows={3}
+              maxLength={500}
+              value={customer.notes}
+              onChange={(e) => updateCustomer("notes", e.target.value)}
+              required={fields.notes === "required"}
+              className={styles.field}
+            />
+          </div>
+        )}
 
         {state.error && <p className={styles.error}>{state.error}</p>}
 

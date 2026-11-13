@@ -180,14 +180,10 @@ export async function createBookingAction(
     staffId: formData.get("staffId") || undefined,
     date: formData.get("date"),
     time: formData.get("time"),
-    customerName: formData.get("customerName"),
-    customerPhone: formData.get("customerPhone"),
-    customerEmail: formData.get("customerEmail"),
-    notes: formData.get("notes"),
   });
 
   if (!parsed.success) {
-    return { error: "Please fill in all required fields." };
+    return { error: "Please pick a service, a date and a time." };
   }
 
   const data = parsed.data;
@@ -207,11 +203,17 @@ export async function createBookingAction(
     // Customers only pick staff when the shop lets them.
     staffId: shop.staffChoice === "choose" ? data.staffId : undefined,
     customer: {
-      name: data.customerName,
-      phone: data.customerPhone,
-      email: data.customerEmail || null,
-      notes: data.notes || null,
+      name: formData.get("customerName"),
+      phone: formData.get("customerPhone"),
+      email: formData.get("customerEmail"),
+      notes: formData.get("notes"),
     },
+    // Custom questions arrive as field_<key>.
+    answers: Object.fromEntries(
+      [...formData.entries()]
+        .filter(([name]) => name.startsWith("field_"))
+        .map(([name, value]) => [name.slice("field_".length), value]),
+    ),
   });
 
   // Returned rather than redirected, so the widget can confirm inline (the

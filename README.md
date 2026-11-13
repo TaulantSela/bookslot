@@ -20,6 +20,8 @@ Works anywhere: each shop picks its own time zone and currency.
 | Start-time step, gap after appointments, minimum notice, how far ahead | Availability → Booking rules |
 | Per-service duration, price and its own gap | Services |
 | Staff or resources (chairs, rooms): their services, own hours, time off; clients pick one or "Anyone", or staff are assigned automatically | Staff |
+| Phone, email and notes: required, optional or hidden | Booking form |
+| Custom questions (text, long text, number, dropdown, checkbox, date) — Pro | Booking form |
 
 ## Quick start
 
@@ -110,6 +112,7 @@ Defined in `src/lib/plans.ts` and enforced on the server, so a host page can't u
 | "Powered by BookSlot" badge | Shown | Hidden |
 | Theme overrides (colors, radius, font, dark mode) | — | ✓ |
 | Preselect service, prefill customer | — | ✓ |
+| Custom questions on the booking form | — | ✓ |
 | `booked` / `error` events to the host page | — | ✓ |
 
 There is no payment integration: invoice the customer, then set the plan by hand.

@@ -379,6 +379,83 @@ describe("staff", () => {
   });
 });
 
+describe("booking form", () => {
+  let createBooking: typeof import("./create-booking").createBooking;
+  const DAY = "2030-03-04"; // Monday
+
+  async function formShop(id: string, plan: string, extra: Record<string, unknown> = {}) {
+    await db.insert(schema.shops).values({
+      id,
+      userId: "usr_test",
+      slug: id,
+      name: id,
+      timezone: TZ,
+      plan,
+      ...RULES,
+      createdAt: new Date(),
+      ...extra,
+    });
+    await db.insert(schema.services).values({ id: `svc_${id}`, shopId: id, name: "Visit", durationMinutes: 30 });
+    await db.insert(schema.workingHours).values({ id: `wh_${id}`, shopId: id, dayOfWeek: 1, startTime: "09:00", endTime: "12:00" });
+    await db.insert(schema.formFields).values({
+      id: `fld_${id}`,
+      shopId: id,
+      key: "allergies",
+      label: "Allergies",
+      type: "text",
+      required: true,
+      createdAt: new Date(),
+    });
+    const [row] = await db.select().from(schema.shops).where(eq(schema.shops.id, id));
+    return row;
+  }
+
+  beforeAll(async () => {
+    ({ createBooking } = await import("./create-booking"));
+  });
+
+  it("stores answers to custom questions on Pro", async () => {
+    const shop = await formShop("shop_form_pro", "pro");
+    const missing = await createBooking({
+      shop, serviceId: "svc_shop_form_pro", date: DAY, time: "09:00",
+      customer: { name: "Ana", phone: "070123456" },
+    });
+    expect(missing).toMatchObject({ code: "invalid_answers" });
+
+    const result = await createBooking({
+      shop, serviceId: "svc_shop_form_pro", date: DAY, time: "09:00",
+      customer: { name: "Ana", phone: "070123456" },
+      answers: { allergies: "Latex" },
+    });
+    expect("booking" in result).toBe(true);
+    const [row] = await db
+      .select()
+      .from(schema.appointments)
+      .where(eq(schema.appointments.id, "booking" in result ? result.booking.appointmentId : ""));
+    expect(row.answers).toEqual([{ key: "allergies", label: "Allergies", value: "Latex" }]);
+  });
+
+  it("ignores custom questions on Free, and follows the standard field settings", async () => {
+    const shop = await formShop("shop_form_free", "free", { phoneField: "hidden", emailField: "required" });
+    expect(
+      await createBooking({ shop, serviceId: "svc_shop_form_free", date: DAY, time: "09:00", customer: { name: "Ana" } }),
+    ).toMatchObject({ code: "invalid_customer" });
+
+    const result = await createBooking({
+      shop, serviceId: "svc_shop_form_free", date: DAY, time: "09:00",
+      customer: { name: "Ana", phone: "070123456", email: "ana@example.com" },
+    });
+    expect("booking" in result).toBe(true);
+    const [row] = await db
+      .select()
+      .from(schema.appointments)
+      .where(eq(schema.appointments.id, "booking" in result ? result.booking.appointmentId : ""));
+    expect(row.customerPhone).toBe("");
+    expect(row.customerEmail).toBe("ana@example.com");
+    expect(row.answers).toBeNull();
+  });
+});
+
 describe("cancelAppointmentByToken", () => {
   async function appointmentWith(startsAt: Date, status = "confirmed") {
     const token = newId("cancel");

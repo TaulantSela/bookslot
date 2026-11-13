@@ -4,12 +4,19 @@ import { services, type Shop } from "@/db/schema";
 import {
   bufferFor,
   getActiveStaff,
+  getFormFields,
   getSlotsForDay,
   insertAppointmentIfFree,
   isAcceptingOnlineBookings,
   noOnlineBookingsMessage,
   offersService,
 } from "@/lib/booking";
+import {
+  standardFields,
+  validateAnswers,
+  validateCustomer,
+  type CustomerInput,
+} from "@/lib/booking-form";
 import { buildCancelUrl, sendBookingConfirmation } from "@/lib/email";
 import { newId } from "@/lib/id";
 import { formatAppointmentRange } from "@/lib/slots";
@@ -30,7 +37,14 @@ export type BookingResult = {
 
 export type BookingFailure = {
   error: string;
-  code: "invalid_date" | "limit_reached" | "service_unavailable" | "staff_unavailable" | "slot_taken";
+  code:
+    | "invalid_customer"
+    | "invalid_answers"
+    | "invalid_date"
+    | "limit_reached"
+    | "service_unavailable"
+    | "staff_unavailable"
+    | "slot_taken";
 };
 
 export const SLOT_TAKEN_ERROR = "That time slot is no longer available.";
@@ -46,7 +60,8 @@ export async function createBooking({
   date,
   time,
   staffId,
-  customer,
+  customer: customerInput,
+  answers: answerInput = {},
 }: {
   shop: Shop;
   serviceId: string;
@@ -56,8 +71,18 @@ export async function createBooking({
   time: string;
   /** A specific staff member, or undefined/null for anyone. */
   staffId?: string | null;
-  customer: { name: string; phone: string; email: string | null; notes: string | null };
+  /** Checked against the shop's form settings. */
+  customer: CustomerInput;
+  /** Answers to the shop's custom questions, keyed by question key. */
+  answers?: Record<string, unknown>;
 }): Promise<{ booking: BookingResult } | BookingFailure> {
+  const checkedCustomer = validateCustomer(standardFields(shop), customerInput);
+  if ("error" in checkedCustomer) return { error: checkedCustomer.error, code: "invalid_customer" };
+  const customer = checkedCustomer.customer;
+
+  const checkedAnswers = validateAnswers(await getFormFields(shop), answerInput);
+  if ("error" in checkedAnswers) return { error: checkedAnswers.error, code: "invalid_answers" };
+
   if (!isValidDateString(date)) {
     return { error: "Please pick a valid date.", code: "invalid_date" };
   }
@@ -111,6 +136,7 @@ export async function createBooking({
       endsAt: slot.end,
       bufferMinutes: bufferFor(service, shop),
       notes: customer.notes,
+      answers: checkedAnswers.answers,
       cancelToken,
     });
     if (ok) {

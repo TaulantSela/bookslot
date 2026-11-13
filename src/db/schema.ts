@@ -42,6 +42,11 @@ export const shops = sqliteTable("shops", {
   staffLabel: text("staff_label").notNull().default("Staff member"),
   /** "choose": customers may pick a staff member or "Anyone". "auto": always assigned for them. */
   staffChoice: text("staff_choice").notNull().default("choose"),
+  // Standard booking-form fields: "required" | "optional" | "hidden".
+  // (Name is always required.) See src/lib/booking-form.ts.
+  phoneField: text("phone_field").notNull().default("required"),
+  emailField: text("email_field").notNull().default("optional"),
+  notesField: text("notes_field").notNull().default("optional"),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
 });
 
@@ -76,6 +81,25 @@ export const staff = sqliteTable("staff", {
   serviceIds: text("service_ids", { mode: "json" }).$type<string[]>(),
   /** True: works the shop's weekly hours. False: their own rows in working_hours. */
   useShopHours: integer("use_shop_hours", { mode: "boolean" }).notNull().default(true),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+});
+
+/** Extra questions on the booking form (Pro). */
+export const formFields = sqliteTable("form_fields", {
+  id: text("id").primaryKey(),
+  shopId: text("shop_id")
+    .notNull()
+    .references(() => shops.id, { onDelete: "cascade" }),
+  /** Stable machine name, e.g. "allergies": used in prefill, the API and webhooks. */
+  key: text("key").notNull(),
+  label: text("label").notNull(),
+  /** text | textarea | number | select | checkbox | date */
+  type: text("type").notNull(),
+  required: integer("required", { mode: "boolean" }).notNull().default(false),
+  /** Choices for "select". */
+  options: text("options", { mode: "json" }).$type<string[]>(),
+  helpText: text("help_text"),
+  sortOrder: integer("sort_order").notNull().default(0),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
 });
 
@@ -134,6 +158,8 @@ export const appointments = sqliteTable("appointments", {
   bufferMinutes: integer("buffer_minutes").notNull().default(0),
   status: text("status").notNull().default("confirmed"),
   notes: text("notes"),
+  /** Answers to the shop's custom questions, with the label as it was when booked. */
+  answers: text("answers", { mode: "json" }).$type<BookingAnswer[]>(),
   cancelToken: text("cancel_token").notNull().unique(),
   reminderSentAt: integer("reminder_sent_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
@@ -147,6 +173,7 @@ export const shopsRelations = relations(shops, ({ one, many }) => ({
   user: one(users, { fields: [shops.userId], references: [users.id] }),
   services: many(services),
   staff: many(staff),
+  formFields: many(formFields),
   workingHours: many(workingHours),
   dateOverrides: many(dateOverrides),
   appointments: many(appointments),
@@ -180,10 +207,13 @@ export const appointmentsRelations = relations(appointments, ({ one }) => ({
   }),
 }));
 
+export type BookingAnswer = { key: string; label: string; value: string | number | boolean };
+
 export type User = typeof users.$inferSelect;
 export type Shop = typeof shops.$inferSelect;
 export type Service = typeof services.$inferSelect;
 export type Staff = typeof staff.$inferSelect;
+export type FormField = typeof formFields.$inferSelect;
 export type WorkingHour = typeof workingHours.$inferSelect;
 export type DateOverride = typeof dateOverrides.$inferSelect;
 export type Appointment = typeof appointments.$inferSelect;

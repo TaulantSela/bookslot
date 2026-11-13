@@ -118,6 +118,7 @@ describe("plans", () => {
       customTheme: false,
       prefill: false,
       hostEvents: false,
+      customFields: false,
     });
     expect(PLAN_ENTITLEMENTS.free.monthlyBookingLimit).toBeGreaterThan(0);
     expect(PLAN_ENTITLEMENTS.pro).toMatchObject({
@@ -126,6 +127,7 @@ describe("plans", () => {
       customTheme: true,
       prefill: true,
       hostEvents: true,
+      customFields: true,
     });
   });
 
