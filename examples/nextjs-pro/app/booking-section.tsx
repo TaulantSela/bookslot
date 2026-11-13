@@ -16,6 +16,17 @@ const TREATMENTS = [
   { id: "svc_brightsmile_whitening", name: "Teeth whitening", detail: "60 min · 6000 MKD" },
 ];
 
+// Staff ids from the clinic's BookSlot account. Dr. Taylor doesn't do whitening.
+const DENTISTS = [
+  { id: "", name: "Any dentist", services: null },
+  { id: "stf_brightsmile_morgan", name: "Dr. Morgan", services: null },
+  {
+    id: "stf_brightsmile_taylor",
+    name: "Dr. Taylor",
+    services: ["svc_brightsmile_checkup", "svc_brightsmile_consult"],
+  },
+];
+
 // Matches the clinic's own brand instead of BookSlot's defaults (Pro).
 const THEME: BookSlotTheme = {
   primary: "#2dd4bf",
@@ -34,6 +45,15 @@ export function BookingSection({
   bookslotUrl: string;
 }) {
   const [service, setService] = useState(TREATMENTS[0].id);
+  const [dentist, setDentist] = useState("");
+  const dentists = DENTISTS.filter((d) => !d.services || d.services.includes(service));
+
+  function chooseService(id: string) {
+    setService(id);
+    // Keep the dentist only if they offer the new treatment.
+    const current = DENTISTS.find((d) => d.id === dentist);
+    if (current?.services && !current.services.includes(id)) setDentist("");
+  }
   const [booking, setBooking] = useState<BookSlotBooking | null>(null);
   const [log, setLog] = useState<string[]>([]);
 
@@ -58,7 +78,7 @@ export function BookingSection({
                 <button
                   type="button"
                   aria-pressed={service === t.id}
-                  onClick={() => setService(t.id)}
+                  onClick={() => chooseService(t.id)}
                 >
                   <strong>{t.name}</strong>
                   <span>{t.detail}</span>
@@ -67,11 +87,25 @@ export function BookingSection({
             ))}
           </ul>
 
+          <div className={styles.dentists} role="group" aria-label="Dentist">
+            {dentists.map((d) => (
+              <button
+                key={d.id || "any"}
+                type="button"
+                aria-pressed={dentist === d.id}
+                onClick={() => setDentist(d.id)}
+              >
+                {d.name}
+              </button>
+            ))}
+          </div>
+
           {booking && (
             <div className={styles.confirmation} role="status">
               <strong>Added to your patient portal</strong>
               <p>
-                {booking.serviceName}, {booking.when}
+                {booking.serviceName}
+                {booking.staffName ? ` with ${booking.staffName}` : ""}, {booking.when}
               </p>
               <p className={styles.muted}>Appointment {booking.appointmentId}</p>
             </div>
@@ -89,6 +123,7 @@ export function BookingSection({
             shop="bright-smile-dental"
             theme={THEME}
             service={service}
+            staff={dentist} // "" = any dentist
             customer={patient}
             onReady={({ shop }) => logEvent(`ready (${shop})`)}
             onResize={({ height }) => logEvent(`resize → ${height}px`)}

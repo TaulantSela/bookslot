@@ -8,7 +8,7 @@
 
 import { useEffect, useRef, type CSSProperties } from "react";
 
-export const DEFAULT_BOOKSLOT_URL = "https://bookslot-rho.vercel.app";
+export const DEFAULT_BOOKSLOT_URL = "https://bookslot.taulantsela.com";
 
 export type BookSlotTheme = {
   /** Hex colour for buttons and highlights. */
@@ -28,12 +28,17 @@ export type BookSlotCustomer = {
   email?: string;
   phone?: string;
   notes?: string;
+  /** Answers to the shop's custom questions, keyed by question key (Dashboard → Booking form). */
+  fields?: Record<string, string | number | boolean>;
 };
 
 export type BookSlotBooking = {
   appointmentId: string;
   serviceId: string;
   serviceName: string;
+  /** Who it's with; null when the shop has no staff. */
+  staffId: string | null;
+  staffName: string | null;
   /** ISO timestamp. */
   startsAt: string;
   /** ISO timestamp. */
@@ -51,6 +56,8 @@ export type BookSlotWidgetProps = {
   theme?: BookSlotTheme;
   /** Pro: service id to preselect (listed in Dashboard → Widget). Can change at any time. */
   service?: string;
+  /** Pro: staff member id to preselect (listed in Dashboard → Widget), or "" for anyone. Can change at any time. */
+  staff?: string;
   /** Pro: details of the signed-in user. Sent by postMessage, never in the URL. */
   customer?: BookSlotCustomer;
   /** Height in pixels before the widget reports its own size. Default 720. */
@@ -73,7 +80,7 @@ type EventName = "ready" | "resize" | "booked" | "error";
 
 type BookSlotInstance = {
   on(type: EventName, fn: (detail: unknown) => void): BookSlotInstance;
-  prefill(customer: BookSlotCustomer, service?: string): BookSlotInstance;
+  prefill(customer: BookSlotCustomer, service?: string, staff?: string): BookSlotInstance;
   destroy(): void;
 };
 
@@ -144,6 +151,7 @@ export function BookSlotWidget({
   bookslotUrl = DEFAULT_BOOKSLOT_URL,
   theme,
   service,
+  staff,
   customer,
   initialHeight,
   maxWidth,
@@ -159,9 +167,9 @@ export function BookSlotWidget({
   const widget = useRef<BookSlotInstance | null>(null);
 
   // Latest props for the widget's callbacks, without remounting it.
-  const latest = useRef({ service, customer, onReady, onResize, onBooked, onError });
+  const latest = useRef({ service, staff, customer, onReady, onResize, onBooked, onError });
   useEffect(() => {
-    latest.current = { service, customer, onReady, onResize, onBooked, onError };
+    latest.current = { service, staff, customer, onReady, onResize, onBooked, onError };
   });
 
   // Theme travels in the iframe URL, so a new theme means a new frame.
@@ -174,11 +182,12 @@ export function BookSlotWidget({
     loadBookSlot(bookslotUrl).then(
       (api) => {
         if (cancelled || !container.current) return;
-        const { service, customer } = latest.current;
+        const { service, staff, customer } = latest.current;
         instance = api.mount(container.current, {
           shop,
           theme: JSON.parse(themeKey),
           service,
+          staff: staff || undefined,
           prefill: customer,
           height: initialHeight,
           maxWidth,
@@ -203,10 +212,11 @@ export function BookSlotWidget({
     };
   }, [shop, bookslotUrl, themeKey, initialHeight, maxWidth, title]);
 
-  // Switch service when the host page picks a different one.
+  // Switch service or staff member when the host page picks a different one.
+  // staff "" means anyone; undefined leaves the customer's own choice alone.
   useEffect(() => {
-    if (service) widget.current?.prefill({}, service);
-  }, [service]);
+    if (service || staff !== undefined) widget.current?.prefill({}, service, staff);
+  }, [service, staff]);
 
   // Re-send customer details when they change (e.g. after sign-in).
   const customerKey = JSON.stringify(customer ?? {});

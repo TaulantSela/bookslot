@@ -69,6 +69,12 @@
 .booking h2 { margin: 0 0 8px; font-size: 28px; font-weight: 700; }
 .lead { margin: 0 0 24px; color: var(--soft); }
 
+.dentists { display: flex; flex-wrap: wrap; gap: 8px; margin: -8px 0 24px; }
+.dentists button {
+  padding: 8px 14px; border-radius: 999px; border: 1px solid #c8dde6; background: #fff;
+  color: #0f2a3d; font: inherit; font-size: 14px; cursor: pointer;
+}
+.dentists button[aria-pressed="true"] { background: #0f2a3d; border-color: #0f2a3d; color: #fff; }
 .treatments { list-style: none; padding: 0; margin: 0 0 24px; display: grid; gap: 10px; }
 .treatments button {
   width: 100%;
