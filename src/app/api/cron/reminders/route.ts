@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { appointments, services, shops, staff } from "@/db/schema";
 import { buildCancelUrl, sendReminderEmail } from "@/lib/email";
+import { retryDueDeliveries } from "@/lib/webhooks";
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
@@ -77,5 +78,9 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.json({ checked: pending.length, sent });
+  // The daily run also retries webhook deliveries that are still failing
+  // (most retries happen sooner, when the shop's next event is sent).
+  const webhookRetries = await retryDueDeliveries({ limit: 200 });
+
+  return NextResponse.json({ checked: pending.length, sent, webhookRetries });
 }

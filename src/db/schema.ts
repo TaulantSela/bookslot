@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm";
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
@@ -165,6 +165,64 @@ export const appointments = sqliteTable("appointments", {
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
 });
 
+/** Secret keys for the public API (Pro). Only a hash is stored. */
+export const apiKeys = sqliteTable("api_keys", {
+  id: text("id").primaryKey(),
+  shopId: text("shop_id")
+    .notNull()
+    .references(() => shops.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  /** First characters of the key, to recognise it in the dashboard. */
+  prefix: text("prefix").notNull(),
+  /** SHA-256 of the full key, hex. */
+  hash: text("hash").notNull().unique(),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  lastUsedAt: integer("last_used_at", { mode: "timestamp" }),
+  revokedAt: integer("revoked_at", { mode: "timestamp" }),
+});
+
+/** URLs a shop's appointment events are POSTed to (Pro). */
+export const webhookEndpoints = sqliteTable("webhook_endpoints", {
+  id: text("id").primaryKey(),
+  shopId: text("shop_id")
+    .notNull()
+    .references(() => shops.id, { onDelete: "cascade" }),
+  url: text("url").notNull(),
+  /** Signs every delivery (HMAC-SHA256); the shop verifies with it. */
+  secret: text("secret").notNull(),
+  /** Event types to send. */
+  events: text("events", { mode: "json" }).$type<string[]>().notNull(),
+  active: integer("active", { mode: "boolean" }).notNull().default(true),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+});
+
+/** One event for one endpoint, with its retry state. */
+export const webhookDeliveries = sqliteTable(
+  "webhook_deliveries",
+  {
+    id: text("id").primaryKey(),
+    endpointId: text("endpoint_id")
+      .notNull()
+      .references(() => webhookEndpoints.id, { onDelete: "cascade" }),
+    shopId: text("shop_id")
+      .notNull()
+      .references(() => shops.id, { onDelete: "cascade" }),
+    eventId: text("event_id").notNull(),
+    event: text("event").notNull(),
+    /** The exact JSON body sent (and signed). */
+    payload: text("payload").notNull(),
+    /** pending | succeeded | failed */
+    status: text("status").notNull().default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    nextAttemptAt: integer("next_attempt_at", { mode: "timestamp" }),
+    lastStatusCode: integer("last_status_code"),
+    lastError: text("last_error"),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+    deliveredAt: integer("delivered_at", { mode: "timestamp" }),
+  },
+  (table) => [index("webhook_deliveries_due").on(table.status, table.nextAttemptAt)],
+);
+
 export const usersRelations = relations(users, ({ many }) => ({
   shops: many(shops),
 }));
@@ -214,6 +272,9 @@ export type Shop = typeof shops.$inferSelect;
 export type Service = typeof services.$inferSelect;
 export type Staff = typeof staff.$inferSelect;
 export type FormField = typeof formFields.$inferSelect;
+export type ApiKey = typeof apiKeys.$inferSelect;
+export type WebhookEndpoint = typeof webhookEndpoints.$inferSelect;
+export type WebhookDelivery = typeof webhookDeliveries.$inferSelect;
 export type WorkingHour = typeof workingHours.$inferSelect;
 export type DateOverride = typeof dateOverrides.$inferSelect;
 export type Appointment = typeof appointments.$inferSelect;
