@@ -50,6 +50,7 @@ export function widgetScript(base: string) {
         if (theme[key] != null && theme[key] !== "") query.set(key, String(theme[key]));
       });
       if (options.service) query.set("service", String(options.service));
+      if (options.staff) query.set("staff", String(options.staff));
 
       var iframe = document.createElement("iframe");
       iframe.className = "bookslot-frame";
@@ -99,9 +100,9 @@ export function widgetScript(base: string) {
           handlers[type] = (handlers[type] || []).filter(function (h) { return h !== fn; });
           return widget;
         },
-        /** Fill in customer details (Pro plan). Safe to call before the widget loads. */
-        prefill: function (customer, service) {
-          record.send({ type: "prefill", customer: customer || {}, service: service });
+        /** Fill in customer details, and optionally pick a service and staff member (Pro plan). Safe to call before the widget loads. */
+        prefill: function (customer, service, staff) {
+          record.send({ type: "prefill", customer: customer || {}, service: service, staff: staff });
           return widget;
         },
         destroy: function () {
@@ -168,6 +169,7 @@ export function widgetScript(base: string) {
     height: d.height,
     maxWidth: d.maxWidth,
     service: d.service,
+    staff: d.staff,
     theme: {
       primary: d.primary || d.color,
       background: d.background,

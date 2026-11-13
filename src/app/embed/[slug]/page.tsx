@@ -26,12 +26,23 @@ export default async function EmbedPage({
   const context = await getPublicBookingContext(slug);
   if (!context) notFound();
 
-  const { shop, services, entitlements, bookingOpen, closedMessage, lastBookableDate } = context;
+  const { shop, services, staff, entitlements, bookingOpen, closedMessage, lastBookableDate } = context;
   const overrides = entitlements.customTheme ? parseThemeParams(query) : {};
   const requestedService = first(query.service);
   const initialServiceId =
     entitlements.prefill && services.some((s) => s.id === requestedService)
       ? requestedService
+      : undefined;
+  const requestedStaff = first(query.staff);
+  const initialStaffId =
+    entitlements.prefill &&
+    shop.staffChoice === "choose" &&
+    staff.some(
+      (m) =>
+        m.id === requestedStaff &&
+        (!initialServiceId || m.serviceIds == null || m.serviceIds.includes(initialServiceId)),
+    )
+      ? requestedStaff
       : undefined;
 
   const css = buildThemeCss({
@@ -52,9 +63,13 @@ export default async function EmbedPage({
         timezone={shop.timezone}
         services={services}
         lastBookableDate={lastBookableDate}
+        staff={staff}
+        staffLabel={shop.staffLabel}
+        staffChoice={shop.staffChoice === "auto" ? "auto" : "choose"}
         bookingOpen={bookingOpen}
         closedMessage={closedMessage}
         initialServiceId={initialServiceId}
+        initialStaffId={initialStaffId}
         badgeHref={entitlements.showBadge ? buildBadgeUrl(shop.slug) : undefined}
         host={{
           origin: parseParentOrigin(first(query.origin)),

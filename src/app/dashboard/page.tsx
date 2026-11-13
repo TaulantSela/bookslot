@@ -2,7 +2,7 @@ import Link from "next/link";
 import { and, eq, gte } from "drizzle-orm";
 import { formatInTimeZone } from "date-fns-tz";
 import { db } from "@/db";
-import { appointments, services } from "@/db/schema";
+import { appointments, services, staff } from "@/db/schema";
 import { getDashboardContext } from "@/lib/actions";
 import { buildBookingUrl, buildEmbedUrl } from "@/lib/email";
 import { Card } from "@/components/ui";
@@ -16,9 +16,11 @@ export default async function DashboardPage() {
     .select({
       appointment: appointments,
       serviceName: services.name,
+      staffName: staff.name,
     })
     .from(appointments)
     .innerJoin(services, eq(appointments.serviceId, services.id))
+    .leftJoin(staff, eq(appointments.staffId, staff.id))
     .where(
       and(
         eq(appointments.shopId, ctx.shop.id),
@@ -74,11 +76,14 @@ export default async function DashboardPage() {
           <p className="mt-4 text-sm text-zinc-500">No upcoming appointments yet.</p>
         ) : (
           <ul className="mt-4 divide-y divide-zinc-100">
-            {upcoming.map(({ appointment, serviceName }) => (
+            {upcoming.map(({ appointment, serviceName, staffName }) => (
               <li key={appointment.id} className="flex items-center justify-between py-3">
                 <div>
                   <p className="font-medium text-zinc-900">{appointment.customerName}</p>
-                  <p className="text-sm text-zinc-500">{serviceName}</p>
+                  <p className="text-sm text-zinc-500">
+                    {serviceName}
+                    {staffName ? ` · ${staffName}` : ""}
+                  </p>
                 </div>
                 <p className="text-sm text-zinc-600">
                   {formatInTimeZone(

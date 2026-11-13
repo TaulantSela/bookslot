@@ -22,6 +22,13 @@
       "when": 1794568622523,
       "tag": "0002_shop_config",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1794569462850,
+      "tag": "0003_staff",
+      "breakpoints": true
     }
   ]
 }

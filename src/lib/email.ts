@@ -24,6 +24,8 @@ type AppointmentEmail = {
   customerName: string;
   shopName: string;
   serviceName: string;
+  /** Who it's with, in shops with staff. */
+  staffName?: string | null;
   startsAt: Date;
   endsAt: Date;
   timezone: string;
@@ -35,6 +37,7 @@ function appointmentEmailHtml({
   intro,
   cancelPrompt,
   serviceName,
+  staffName,
   when,
   cancelUrl,
 }: {
@@ -42,6 +45,7 @@ function appointmentEmailHtml({
   intro: string;
   cancelPrompt: string;
   serviceName: string;
+  staffName?: string | null;
   when: string;
   cancelUrl: string;
 }) {
@@ -50,7 +54,7 @@ function appointmentEmailHtml({
       <h2 style="margin: 0 0 8px;">${escapeHtml(heading)}</h2>
       <p>${intro}</p>
       <p style="background:#f4f4f5;padding:16px;border-radius:8px;">
-        <strong>${escapeHtml(serviceName)}</strong><br/>
+        <strong>${escapeHtml(serviceName)}</strong>${staffName ? ` with ${escapeHtml(staffName)}` : ""}<br/>
         ${escapeHtml(when)}
       </p>
       <p>${escapeHtml(cancelPrompt)} <a href="${escapeHtml(cancelUrl)}">Cancel appointment</a></p>
@@ -64,6 +68,7 @@ export async function sendBookingConfirmation(email: AppointmentEmail) {
     intro: `Hi ${escapeHtml(email.customerName)}, your appointment at <strong>${escapeHtml(email.shopName)}</strong> is booked.`,
     cancelPrompt: "Need to cancel?",
     serviceName: email.serviceName,
+    staffName: email.staffName,
     when: formatAppointmentRange(email.startsAt, email.endsAt, email.timezone),
     cancelUrl: email.cancelUrl,
   });
@@ -81,6 +86,7 @@ export async function sendReminderEmail(email: AppointmentEmail) {
     intro: `Hi ${escapeHtml(email.customerName)}, this is a reminder for your appointment at <strong>${escapeHtml(email.shopName)}</strong>.`,
     cancelPrompt: "Can't make it?",
     serviceName: email.serviceName,
+    staffName: email.staffName,
     when: formatAppointmentRange(email.startsAt, email.endsAt, email.timezone),
     cancelUrl: email.cancelUrl,
   });

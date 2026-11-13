@@ -19,25 +19,16 @@ import {
   verifyPassword,
   getUserByEmail,
 } from "@/lib/auth";
-import {
-  bufferFor,
-  getSlotsForDay,
-  insertAppointmentIfFree,
-  isAcceptingOnlineBookings,
-  noOnlineBookingsMessage,
-} from "@/lib/booking";
+import { createBooking, type BookingResult } from "@/lib/create-booking";
 import {
   firstIssue,
   refreshDashboard,
   requireOwnerShop,
   type ActionState,
 } from "@/lib/dashboard";
-import { buildCancelUrl, sendBookingConfirmation } from "@/lib/email";
 import { MAX_EMBED_DOMAINS, parseEmbedDomains } from "@/lib/embed";
 import { newId, slugify } from "@/lib/id";
 import { guessCurrency } from "@/lib/regional";
-import { formatAppointmentRange } from "@/lib/slots";
-import { isValidDateString } from "@/lib/slots-internal";
 import {
   bookingSchema,
   loginSchema,
@@ -48,15 +39,7 @@ import {
 
 export type { ActionState };
 
-export type BookingResult = {
-  appointmentId: string;
-  serviceId: string;
-  serviceName: string;
-  startsAt: string;
-  endsAt: string;
-  /** Human-readable date and time range in the shop's timezone. */
-  when: string;
-};
+export type { BookingResult };
 
 export type BookingActionState = ActionState & { booking?: BookingResult };
 
@@ -187,8 +170,6 @@ export async function logoutAction() {
   redirect("/");
 }
 
-const SLOT_TAKEN_ERROR = "That time slot is no longer available.";
-
 export async function createBookingAction(
   _prev: BookingActionState,
   formData: FormData,
@@ -196,6 +177,7 @@ export async function createBookingAction(
   const parsed = bookingSchema.safeParse({
     shopSlug: formData.get("shopSlug"),
     serviceId: formData.get("serviceId"),
+    staffId: formData.get("staffId") || undefined,
     date: formData.get("date"),
     time: formData.get("time"),
     customerName: formData.get("customerName"),
@@ -209,11 +191,6 @@ export async function createBookingAction(
   }
 
   const data = parsed.data;
-
-  if (!isValidDateString(data.date)) {
-    return { error: "Please pick a valid date." };
-  }
-
   const [shop] = await db
     .select()
     .from(shops)
@@ -222,69 +199,24 @@ export async function createBookingAction(
 
   if (!shop) return { error: "Shop not found." };
 
-  if (!(await isAcceptingOnlineBookings(shop))) {
-    return { error: noOnlineBookingsMessage(shop) };
-  }
-
-  const [service] = await db
-    .select()
-    .from(services)
-    .where(and(eq(services.id, data.serviceId), eq(services.shopId, shop.id)))
-    .limit(1);
-
-  if (!service || !service.active) return { error: "Service not available." };
-
-  // Never trust the submitted time: it must be one of the slots the shop
-  // actually offers (inside working hours, in the future, on the grid).
-  const slots = await getSlotsForDay({ shop, service, date: data.date });
-  const slot = slots.find((s) => s.label === data.time);
-
-  if (!slot) return { error: SLOT_TAKEN_ERROR };
-
-  const cancelToken = newId("cancel");
-  const appointmentId = newId("appt");
-
-  const booked = await insertAppointmentIfFree({
-    id: appointmentId,
-    shopId: shop.id,
-    serviceId: service.id,
-    customerName: data.customerName,
-    customerPhone: data.customerPhone,
-    customerEmail: data.customerEmail || null,
-    startsAt: slot.start,
-    endsAt: slot.end,
-    bufferMinutes: bufferFor(service, shop),
-    notes: data.notes || null,
-    cancelToken,
+  const result = await createBooking({
+    shop,
+    serviceId: data.serviceId,
+    date: data.date,
+    time: data.time,
+    // Customers only pick staff when the shop lets them.
+    staffId: shop.staffChoice === "choose" ? data.staffId : undefined,
+    customer: {
+      name: data.customerName,
+      phone: data.customerPhone,
+      email: data.customerEmail || null,
+      notes: data.notes || null,
+    },
   });
-
-  if (!booked) return { error: SLOT_TAKEN_ERROR };
-
-  if (data.customerEmail) {
-    await sendBookingConfirmation({
-      to: data.customerEmail,
-      customerName: data.customerName,
-      shopName: shop.name,
-      serviceName: service.name,
-      startsAt: slot.start,
-      endsAt: slot.end,
-      timezone: shop.timezone,
-      cancelUrl: buildCancelUrl(cancelToken),
-    });
-  }
 
   // Returned rather than redirected, so the widget can confirm inline (the
   // customer stays inside the embed) and tell the host page about it.
-  return {
-    booking: {
-      appointmentId,
-      serviceId: service.id,
-      serviceName: service.name,
-      startsAt: slot.start.toISOString(),
-      endsAt: slot.end.toISOString(),
-      when: formatAppointmentRange(slot.start, slot.end, shop.timezone),
-    },
-  };
+  return "booking" in result ? { booking: result.booking } : { error: result.error };
 }
 
 export async function saveEmbedDomainsAction(

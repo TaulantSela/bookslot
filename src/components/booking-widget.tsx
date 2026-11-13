@@ -29,6 +29,17 @@ export type HostBridge = {
   prefill: boolean;
 };
 
+type StaffOption = {
+  id: string;
+  name: string;
+  /** Null = offers every service. */
+  serviceIds: string[] | null;
+};
+
+function offers(member: StaffOption, serviceId: string) {
+  return member.serviceIds == null || member.serviceIds.includes(serviceId);
+}
+
 type Props = {
   shopSlug: string;
   shopName: string;
@@ -40,8 +51,16 @@ type Props = {
   /** False once a free plan's monthly booking limit is reached. */
   bookingOpen?: boolean;
   closedMessage?: string;
+  /** People customers can book with. Empty = the shop is one calendar. */
+  staff?: StaffOption[];
+  /** What staff are called, e.g. "Barber". */
+  staffLabel?: string;
+  /** "auto" hides the staff picker and assigns someone free. */
+  staffChoice?: "choose" | "auto";
   /** Preselected service (already validated against `services`). */
   initialServiceId?: string;
+  /** Preselected staff member (already validated). */
+  initialStaffId?: string;
   /** Link for the "Powered by BookSlot" badge; no badge when omitted. */
   badgeHref?: string;
   host?: HostBridge;
@@ -85,16 +104,22 @@ export function BookingWidget({
   timezone,
   services,
   lastBookableDate,
+  staff = [],
+  staffLabel = "Staff member",
+  staffChoice = "choose",
   embed = false,
   bookingOpen = true,
   closedMessage,
   initialServiceId,
+  initialStaffId,
   badgeHref,
   host,
 }: Props) {
   const [serviceId, setServiceId] = useState(
     initialServiceId ?? services[0]?.id ?? "",
   );
+  /** "" = anyone. */
+  const [staffId, setStaffId] = useState(initialStaffId ?? "");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [slots, setSlots] = useState<string[]>([]);
@@ -107,14 +132,29 @@ export function BookingWidget({
   const rootRef = useRef<HTMLDivElement>(null);
   // Current choice, readable from the host message listener: a host page can
   // switch the service after the customer already picked a date.
-  const selection = useRef({ date: "", serviceId });
+  const selection = useRef({ date: "", serviceId, staffId: initialStaffId ?? "" });
+  const showStaff = staffChoice === "choose" && staff.length > 0;
+  const staffForService = staff.filter((member) => offers(member, serviceId));
 
   function chooseService(nextServiceId: string) {
     if (nextServiceId === selection.current.serviceId) return;
     selection.current.serviceId = nextServiceId;
     setServiceId(nextServiceId);
+    // Someone who doesn't offer the new service can't stay selected.
+    const current = staff.find((m) => m.id === selection.current.staffId);
+    if (current && !offers(current, nextServiceId)) {
+      selection.current.staffId = "";
+      setStaffId("");
+    }
     // Times depend on the service's duration, so reload them for that date.
-    if (selection.current.date) loadSlots(selection.current.date, nextServiceId);
+    if (selection.current.date) loadSlots(selection.current.date);
+  }
+
+  function chooseStaff(nextStaffId: string) {
+    if (nextStaffId === selection.current.staffId) return;
+    selection.current.staffId = nextStaffId;
+    setStaffId(nextStaffId);
+    if (selection.current.date) loadSlots(selection.current.date);
   }
 
   // Controlled on purpose: React resets uncontrolled fields after every form
@@ -182,16 +222,25 @@ export function BookingWidget({
       ) {
         chooseService(data.service);
       }
+      if (
+        staffChoice === "choose" &&
+        typeof data.staff === "string" &&
+        staff.some((m) => m.id === data.staff && offers(m, selection.current.serviceId))
+      ) {
+        chooseStaff(data.staff);
+      }
     }
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
     // chooseService only touches refs and state setters, so the copy from the
     // render that subscribed stays correct.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [embed, host, services]);
+  }, [embed, host, services, staff, staffChoice]);
 
   // ---- Slots ----------------------------------------------------------------
-  async function loadSlots(nextDate: string, nextServiceId: string) {
+  /** Loads times for a date, for the currently selected service and staff member. */
+  async function loadSlots(nextDate: string) {
+    const { serviceId: nextServiceId, staffId: nextStaffId } = selection.current;
     selection.current.date = nextDate;
     setDate(nextDate);
     setTime("");
@@ -211,6 +260,7 @@ export function BookingWidget({
         serviceId: nextServiceId,
         date: nextDate,
       });
+      if (nextStaffId) params.set("staffId", nextStaffId);
       const res = await fetch(`/api/availability?${params}`);
       if (!res.ok) throw new Error(`Availability request failed: ${res.status}`);
       const data: { slots?: string[]; closed?: { label: string | null } } = await res.json();
@@ -241,10 +291,7 @@ export function BookingWidget({
       postToHost("error", { message: result.error });
       // A failed booking usually means the slot was just taken: refresh the
       // list so the customer doesn't keep picking an unavailable time.
-      void loadSlots(
-        String(formData.get("date") ?? ""),
-        String(formData.get("serviceId") ?? ""),
-      );
+      void loadSlots(String(formData.get("date") ?? ""));
     }
     return result;
   }, {});
@@ -281,6 +328,7 @@ export function BookingWidget({
         <h2 className="mt-4 text-xl font-semibold">You&apos;re booked</h2>
         <p className="mt-2 text-sm">
           <span className="font-medium">{booked.serviceName}</span>
+          {booked.staffName && <> with {booked.staffName}</>}
           <br />
           {booked.when}
         </p>
@@ -303,6 +351,7 @@ export function BookingWidget({
       <form action={formAction} className="space-y-5">
         <input type="hidden" name="shopSlug" value={shopSlug} />
         <input type="hidden" name="serviceId" value={serviceId} />
+        <input type="hidden" name="staffId" value={showStaff ? staffId : ""} />
         <input type="hidden" name="date" value={date} />
         <input type="hidden" name="time" value={time} />
 
@@ -331,6 +380,27 @@ export function BookingWidget({
           </div>
         </div>
 
+        {showStaff && staffForService.length > 0 && (
+          <div>
+            <span className={styles.label}>{staffLabel}</span>
+            <div className="flex flex-wrap gap-2">
+              {[{ id: "", name: "Anyone" }, ...staffForService].map((member) => (
+                <button
+                  key={member.id || "anyone"}
+                  type="button"
+                  aria-pressed={staffId === member.id}
+                  onClick={() => chooseStaff(member.id)}
+                  className={`${styles.option} px-4 py-2 ${
+                    staffId === member.id ? styles.serviceSelected : styles.optionIdle
+                  }`}
+                >
+                  {member.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div>
           <label htmlFor="date" className={styles.label}>
             Date
@@ -341,7 +411,7 @@ export function BookingWidget({
             min={minDate}
             max={lastBookableDate}
             value={date}
-            onChange={(e) => loadSlots(e.target.value, serviceId)}
+            onChange={(e) => loadSlots(e.target.value)}
             required
             className={styles.field}
           />

@@ -7,7 +7,7 @@
 import { createClient } from "@libsql/client";
 import { drizzle } from "drizzle-orm/libsql";
 import { eq } from "drizzle-orm";
-import { services, shops, users, workingHours } from "../src/db/schema";
+import { services, shops, staff, users, workingHours } from "../src/db/schema";
 import { hashPassword } from "../src/lib/auth";
 import { newId } from "../src/lib/id";
 
@@ -26,6 +26,9 @@ type ExampleShop = {
   services: { id: string; name: string; durationMinutes: number; price: number }[];
   days: number[];
   hours: [string, string];
+  staffLabel: string;
+  /** serviceIds null = every service. */
+  staff: { id: string; name: string; serviceIds: string[] | null }[];
 };
 
 const EXAMPLES: ExampleShop[] = [
@@ -48,6 +51,11 @@ const EXAMPLES: ExampleShop[] = [
     ],
     days: [2, 3, 4, 5, 6],
     hours: ["09:00", "19:00"],
+    staffLabel: "Barber",
+    staff: [
+      { id: "stf_lakeside_sam", name: "Sam", serviceIds: null },
+      { id: "stf_lakeside_jordan", name: "Jordan", serviceIds: null },
+    ],
   },
   {
     owner: { email: "dental@example.com", name: "Dr. Besa Osmani" },
@@ -69,8 +77,34 @@ const EXAMPLES: ExampleShop[] = [
     ],
     days: [1, 2, 3, 4, 5],
     hours: ["08:00", "16:00"],
+    staffLabel: "Dentist",
+    staff: [
+      { id: "stf_brightsmile_morgan", name: "Dr. Morgan", serviceIds: null },
+      {
+        id: "stf_brightsmile_taylor",
+        name: "Dr. Taylor",
+        serviceIds: ["svc_brightsmile_checkup", "svc_brightsmile_consult"],
+      },
+    ],
   },
 ];
+
+/** Adds the example's staff to a shop that has none. Returns how many were added. */
+async function ensureStaff(db: ReturnType<typeof drizzle>, shopId: string, example: ExampleShop) {
+  const current = await db.select({ id: staff.id }).from(staff).where(eq(staff.shopId, shopId));
+  if (current.length > 0) return 0;
+  await db.update(shops).set({ staffLabel: example.staffLabel }).where(eq(shops.id, shopId));
+  await db.insert(staff).values(
+    example.staff.map((member, i) => ({
+      ...member,
+      shopId,
+      sortOrder: i,
+      useShopHours: true,
+      createdAt: new Date(),
+    })),
+  );
+  return example.staff.length;
+}
 
 async function main() {
   const url =
@@ -89,7 +123,8 @@ async function main() {
       .from(shops)
       .where(eq(shops.slug, example.shop.slug));
     if (existing.length > 0) {
-      console.log(`  ${example.shop.slug}: already there`);
+      const added = await ensureStaff(db, existing[0].id, example);
+      console.log(`  ${example.shop.slug}: already there${added ? `, added ${added} staff` : ""}`);
       continue;
     }
 
@@ -109,6 +144,7 @@ async function main() {
       timezone: "Europe/Skopje",
       reminderHoursBefore: 24,
       createdAt: now,
+      staffLabel: example.staffLabel,
       ...example.shop,
     });
     await db.insert(services).values(
@@ -131,6 +167,7 @@ async function main() {
         endTime: example.hours[1],
       })),
     );
+    await ensureStaff(db, shopId, example);
     console.log(
       `  ${example.shop.slug}: ${example.shop.plan} plan, login ${example.owner.email} / demo12345`,
     );
