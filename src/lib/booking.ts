@@ -4,16 +4,19 @@ import { db } from "@/db";
 import {
   appointments,
   dateOverrides,
+  formFields,
   services,
   shops,
   staff,
   workingHours,
   type Appointment,
+  type BookingAnswer,
   type Service,
   type Shop,
   type Staff,
 } from "@/db/schema";
 import { entitlementsFor } from "@/lib/plans";
+import { standardFields } from "@/lib/booking-form";
 import { formatPrice } from "@/lib/regional";
 import {
   getAvailableSlots,
@@ -47,6 +50,16 @@ export async function getActiveStaff(shopId: string) {
     .from(staff)
     .where(and(eq(staff.shopId, shopId), eq(staff.active, true)))
     .orderBy(staff.sortOrder, staff.createdAt);
+}
+
+/** The shop's custom questions in form order, or none when the plan doesn't include them. */
+export async function getFormFields(shop: Pick<Shop, "id" | "plan">) {
+  if (!entitlementsFor(shop.plan).customFields) return [];
+  return db
+    .select()
+    .from(formFields)
+    .where(eq(formFields.shopId, shop.id))
+    .orderBy(formFields.sortOrder, formFields.createdAt);
 }
 
 /** Gap kept free after an appointment for this service. */
@@ -95,7 +108,7 @@ export async function getPublicBookingContext(slug: string) {
     .limit(1);
   if (!shop) return null;
 
-  const [activeServices, bookingOpen, team] = await Promise.all([
+  const [activeServices, bookingOpen, team, questions] = await Promise.all([
     db
       .select({
         id: services.id,
@@ -108,10 +121,22 @@ export async function getPublicBookingContext(slug: string) {
       .orderBy(services.sortOrder),
     isAcceptingOnlineBookings(shop),
     getActiveStaff(shop.id),
+    getFormFields(shop),
   ]);
 
   return {
     shop,
+    fields: {
+      ...standardFields(shop),
+      custom: questions.map(({ key, label, type, required, options, helpText }) => ({
+        key,
+        label,
+        type,
+        required,
+        options,
+        helpText,
+      })),
+    },
     staff: team.map(({ id, name, serviceIds }) => ({ id, name, serviceIds })),
     // Prices are formatted here, on the server, so the widget's first render
     // and hydration agree (Intl output differs between runtimes).
@@ -306,6 +331,7 @@ export async function insertAppointmentIfFree(values: {
   /** Gap kept free after this appointment. */
   bufferMinutes?: number;
   notes: string | null;
+  answers?: BookingAnswer[] | null;
   cancelToken: string;
 }) {
   const startsAt = toUnixSeconds(values.startsAt);
@@ -313,6 +339,7 @@ export async function insertAppointmentIfFree(values: {
   const bufferMinutes = values.bufferMinutes ?? 0;
   const blockedUntil = endsAt + bufferMinutes * 60;
   const staffId = values.staffId ?? null;
+  const answersJson = values.answers?.length ? JSON.stringify(values.answers) : null;
 
   // Each appointment occupies its own time plus its gap; two appointments
   // conflict when those spans overlap. With staff, only the same person's
@@ -320,13 +347,13 @@ export async function insertAppointmentIfFree(values: {
   const result = await db.run(sql`
     INSERT INTO appointments (
       id, shop_id, service_id, staff_id, customer_name, customer_phone, customer_email,
-      starts_at, ends_at, buffer_minutes, status, notes, cancel_token,
+      starts_at, ends_at, buffer_minutes, status, notes, answers, cancel_token,
       reminder_sent_at, created_at
     )
     SELECT
       ${values.id}, ${values.shopId}, ${values.serviceId}, ${staffId}, ${values.customerName},
       ${values.customerPhone}, ${values.customerEmail}, ${startsAt}, ${endsAt},
-      ${bufferMinutes}, 'confirmed', ${values.notes}, ${values.cancelToken}, NULL,
+      ${bufferMinutes}, 'confirmed', ${values.notes}, ${answersJson}, ${values.cancelToken}, NULL,
       ${toUnixSeconds(new Date())}
     WHERE NOT EXISTS (
       SELECT 1 FROM appointments

@@ -94,10 +94,8 @@ export const bookingSchema = z.object({
   staffId: z.string().max(40).optional(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   time: z.string().regex(/^\d{2}:\d{2}$/),
-  customerName: z.string().min(2).max(80),
-  customerPhone: z.string().min(5).max(30),
-  customerEmail: z.string().email().optional().or(z.literal("")),
-  notes: z.string().max(500).optional(),
+  // Customer details and answers are checked against the shop's form
+  // settings in createBooking (src/lib/booking-form.ts).
 });
 
 export const DAY_LABELS = [

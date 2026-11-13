@@ -18,6 +18,8 @@ export type Entitlements = {
   prefill: boolean;
   /** Widget sends `booked` and `error` events to the host page. (`ready` and `resize` are always sent.) */
   hostEvents: boolean;
+  /** Custom questions on the booking form. (Showing/hiding the standard fields is free.) */
+  customFields: boolean;
 };
 
 export const PLAN_ENTITLEMENTS: Record<Plan, Entitlements> = {
@@ -27,6 +29,7 @@ export const PLAN_ENTITLEMENTS: Record<Plan, Entitlements> = {
     customTheme: false,
     prefill: false,
     hostEvents: false,
+    customFields: false,
   },
   pro: {
     monthlyBookingLimit: null,
@@ -34,6 +37,7 @@ export const PLAN_ENTITLEMENTS: Record<Plan, Entitlements> = {
     customTheme: true,
     prefill: true,
     hostEvents: true,
+    customFields: true,
   },
 };
 

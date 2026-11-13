@@ -3,6 +3,7 @@ import { formatInTimeZone } from "date-fns-tz";
 import { db } from "@/db";
 import { appointments, services, staff } from "@/db/schema";
 import { getDashboardContext, updateAppointmentStatusAction } from "@/lib/actions";
+import { formatAnswer } from "@/lib/booking-form";
 import { Button, Card } from "@/components/ui";
 import { redirect } from "next/navigation";
 
@@ -49,8 +50,33 @@ export default async function AppointmentsPage() {
             <tbody>
               {rows.map(({ appointment, serviceName, staffName }) => (
                 <tr key={appointment.id} className="border-t border-zinc-100">
-                  <td className="px-4 py-3 font-medium text-zinc-900">
-                    {appointment.customerName}
+                  <td className="px-4 py-3 align-top">
+                    <div className="font-medium text-zinc-900">{appointment.customerName}</div>
+                    {(appointment.customerEmail || appointment.notes || appointment.answers?.length) && (
+                      <details className="mt-1 text-xs text-zinc-600">
+                        <summary className="cursor-pointer text-blue-600">Details</summary>
+                        <dl className="mt-1 space-y-0.5">
+                          {appointment.customerEmail && (
+                            <div>
+                              <dt className="inline text-zinc-400">Email: </dt>
+                              <dd className="inline">{appointment.customerEmail}</dd>
+                            </div>
+                          )}
+                          {appointment.answers?.map((answer) => (
+                            <div key={answer.key}>
+                              <dt className="inline text-zinc-400">{answer.label}: </dt>
+                              <dd className="inline">{formatAnswer(answer.value)}</dd>
+                            </div>
+                          ))}
+                          {appointment.notes && (
+                            <div>
+                              <dt className="inline text-zinc-400">Notes: </dt>
+                              <dd className="inline whitespace-pre-line">{appointment.notes}</dd>
+                            </div>
+                          )}
+                        </dl>
+                      </details>
+                    )}
                   </td>
                   <td className="px-4 py-3">{serviceName}</td>
                   {withStaff && <td className="px-4 py-3">{staffName ?? "—"}</td>}
@@ -61,7 +87,7 @@ export default async function AppointmentsPage() {
                       "d MMM yyyy · HH:mm",
                     )}
                   </td>
-                  <td className="px-4 py-3">{appointment.customerPhone}</td>
+                  <td className="px-4 py-3">{appointment.customerPhone || "—"}</td>
                   <td className="px-4 py-3 capitalize">{appointment.status}</td>
                   <td className="px-4 py-3">
                     {appointment.status === "confirmed" && (
