@@ -1,4 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// These tests are pure; stub the database so importing the modules doesn't
+// open one (CI has no ./data folder).
+vi.mock("@/db", () => ({ db: {} }));
+
 import { generateApiKey, hashApiKey, looksLikeApiKey } from "./api-keys";
 import { isPrivateAddress, signPayload, validateWebhookUrl, verifySignature } from "./webhooks";
 
