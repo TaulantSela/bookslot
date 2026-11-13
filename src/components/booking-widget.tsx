@@ -6,14 +6,15 @@ import {
   type BookingActionState,
   type BookingResult,
 } from "@/lib/actions";
-import { formatPrice } from "@/lib/utils";
+import { formatMinutes } from "@/lib/duration";
 import { formatInTimeZone } from "@/lib/slots";
 
 type Service = {
   id: string;
   name: string;
   durationMinutes: number;
-  priceCents: number | null;
+  /** Formatted on the server in the shop's currency; null = no price shown. */
+  priceLabel: string | null;
 };
 
 /** How the embed talks to the page that hosts it (see public/widget docs). */
@@ -33,6 +34,8 @@ type Props = {
   shopName: string;
   timezone: string;
   services: Service[];
+  /** Last date (yyyy-MM-dd) customers may pick. */
+  lastBookableDate?: string;
   embed?: boolean;
   /** False once a free plan's monthly booking limit is reached. */
   bookingOpen?: boolean;
@@ -81,6 +84,7 @@ export function BookingWidget({
   shopName,
   timezone,
   services,
+  lastBookableDate,
   embed = false,
   bookingOpen = true,
   closedMessage,
@@ -96,6 +100,8 @@ export function BookingWidget({
   const [slots, setSlots] = useState<string[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [slotsError, setSlotsError] = useState(false);
+  /** Set when the shop is closed on the chosen date (holiday, vacation…). */
+  const [closedDay, setClosedDay] = useState<{ label: string | null } | null>(null);
   const [booked, setBooked] = useState<BookingResult | null>(null);
   const latestSlotsRequest = useRef(0);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -190,6 +196,7 @@ export function BookingWidget({
     setDate(nextDate);
     setTime("");
     setSlotsError(false);
+    setClosedDay(null);
     const requestId = ++latestSlotsRequest.current;
 
     if (!nextDate || !nextServiceId) {
@@ -206,9 +213,12 @@ export function BookingWidget({
       });
       const res = await fetch(`/api/availability?${params}`);
       if (!res.ok) throw new Error(`Availability request failed: ${res.status}`);
-      const data: { slots?: string[] } = await res.json();
+      const data: { slots?: string[]; closed?: { label: string | null } } = await res.json();
       // Ignore responses for a date or service the customer has since changed.
-      if (requestId === latestSlotsRequest.current) setSlots(data.slots ?? []);
+      if (requestId === latestSlotsRequest.current) {
+        setSlots(data.slots ?? []);
+        setClosedDay(data.closed ?? null);
+      }
     } catch {
       if (requestId === latestSlotsRequest.current) {
         setSlots([]);
@@ -245,6 +255,7 @@ export function BookingWidget({
     setDate("");
     setTime("");
     setSlots([]);
+    setClosedDay(null);
     setCustomer((prev) => ({ ...prev, notes: "" }));
   }
 
@@ -312,10 +323,8 @@ export function BookingWidget({
               >
                 <div className="font-medium">{service.name}</div>
                 <div className="text-[var(--bs-muted)]">
-                  {service.durationMinutes} min
-                  {formatPrice(service.priceCents)
-                    ? ` · ${formatPrice(service.priceCents)}`
-                    : ""}
+                  {formatMinutes(service.durationMinutes)}
+                  {service.priceLabel ? ` · ${service.priceLabel}` : ""}
                 </div>
               </button>
             ))}
@@ -330,6 +339,7 @@ export function BookingWidget({
             id="date"
             type="date"
             min={minDate}
+            max={lastBookableDate}
             value={date}
             onChange={(e) => loadSlots(e.target.value, serviceId)}
             required
@@ -347,7 +357,13 @@ export function BookingWidget({
             </p>
           ) : slots.length === 0 ? (
             <p className={styles.muted}>
-              {date ? "No available times on this day." : "Pick a date first."}
+              {!date
+                ? "Pick a date first."
+                : closedDay
+                  ? `Closed on this day${closedDay.label ? ` (${closedDay.label})` : ""}. Please pick another date.`
+                  : lastBookableDate && date > lastBookableDate
+                    ? "Bookings aren't open that far ahead yet."
+                    : "No available times on this day."}
             </p>
           ) : (
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">

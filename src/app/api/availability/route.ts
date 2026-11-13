@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { services, shops } from "@/db/schema";
-import { getSlotsForDay } from "@/lib/booking";
+import { getDayAvailability } from "@/lib/booking";
 import { isValidDateString } from "@/lib/slots-internal";
 
 export async function GET(request: Request) {
@@ -39,9 +39,10 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Service not found" }, { status: 404 });
   }
 
-  const slots = await getSlotsForDay({ shop, service, date: dateStr });
+  const { slots, closed } = await getDayAvailability({ shop, service, date: dateStr });
 
   return NextResponse.json({
     slots: slots.map((s) => s.label),
+    ...(closed ? { closed } : {}),
   });
 }

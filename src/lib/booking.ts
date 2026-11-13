@@ -1,8 +1,9 @@
-import { and, count, eq, gt, gte, lt, ne, sql } from "drizzle-orm";
+import { and, count, eq, gt, gte, lt, lte, ne, sql } from "drizzle-orm";
 import { formatInTimeZone } from "date-fns-tz";
 import { db } from "@/db";
 import {
   appointments,
+  dateOverrides,
   services,
   shops,
   workingHours,
@@ -11,8 +12,28 @@ import {
   type Shop,
 } from "@/db/schema";
 import { entitlementsFor } from "@/lib/plans";
-import { getAvailableSlots } from "@/lib/slots";
+import { formatPrice } from "@/lib/regional";
+import { getAvailableSlots, hoursOnDate, lastBookableDate } from "@/lib/slots";
 import { zonedDateTime, zonedDayRange } from "@/lib/slots-internal";
+
+/** The shop settings that decide which times can be booked. */
+export type BookingRules = Pick<
+  Shop,
+  | "id"
+  | "timezone"
+  | "slotIntervalMinutes"
+  | "bufferMinutes"
+  | "minNoticeMinutes"
+  | "maxAdvanceDays"
+>;
+
+/** Gap kept free after an appointment for this service. */
+export function bufferFor(
+  service: Pick<Service, "bufferMinutes">,
+  shop: Pick<Shop, "bufferMinutes">,
+) {
+  return service.bufferMinutes ?? shop.bufferMinutes;
+}
 
 /** Bookings (not cancelled) a shop received since the 1st of this month, in its timezone. */
 export async function monthlyBookingCount(
@@ -68,7 +89,13 @@ export async function getPublicBookingContext(slug: string) {
 
   return {
     shop,
-    services: activeServices,
+    // Prices are formatted here, on the server, so the widget's first render
+    // and hydration agree (Intl output differs between runtimes).
+    services: activeServices.map((service) => ({
+      ...service,
+      priceLabel: formatPrice(service.priceCents, shop.currency),
+    })),
+    lastBookableDate: lastBookableDate(shop.timezone, shop.maxAdvanceDays),
     entitlements: entitlementsFor(shop.plan),
     bookingOpen,
     closedMessage: bookingOpen ? undefined : noOnlineBookingsMessage(shop),
@@ -85,25 +112,43 @@ export async function isAcceptingOnlineBookings(
   return (await monthlyBookingCount(shop, now)) < limit;
 }
 
-/** Bookable slots for one service on one calendar date (yyyy-MM-dd, shop timezone). */
-export async function getSlotsForDay({
+/**
+ * Bookable slots for one service on one calendar date (yyyy-MM-dd, shop
+ * timezone), plus why there are none when the shop is closed that day.
+ */
+export async function getDayAvailability({
   shop,
   service,
   date,
+  now = new Date(),
 }: {
-  shop: Pick<Shop, "id" | "timezone">;
-  service: Pick<Service, "durationMinutes">;
+  shop: BookingRules;
+  service: Pick<Service, "durationMinutes" | "bufferMinutes">;
   date: string;
+  now?: Date;
 }) {
   const day = zonedDayRange(date, shop.timezone);
+  // Gaps can reach across midnight, so look a day either side.
+  const windowStart = new Date(day.start.getTime() - 86_400_000);
+  const windowEnd = new Date(day.end.getTime() + 86_400_000);
 
-  const [hours, dayAppointments] = await Promise.all([
+  const [hours, overrides, nearbyAppointments] = await Promise.all([
     db.select().from(workingHours).where(eq(workingHours.shopId, shop.id)),
-    // Anything overlapping the day, including appointments that started the day before.
+    db
+      .select()
+      .from(dateOverrides)
+      .where(
+        and(
+          eq(dateOverrides.shopId, shop.id),
+          lte(dateOverrides.startDate, date),
+          gte(dateOverrides.endDate, date),
+        ),
+      ),
     db
       .select({
         startsAt: appointments.startsAt,
         endsAt: appointments.endsAt,
+        bufferMinutes: appointments.bufferMinutes,
         status: appointments.status,
       })
       .from(appointments)
@@ -111,19 +156,32 @@ export async function getSlotsForDay({
         and(
           eq(appointments.shopId, shop.id),
           ne(appointments.status, "cancelled"),
-          lt(appointments.startsAt, day.end),
-          gt(appointments.endsAt, day.start),
+          lt(appointments.startsAt, windowEnd),
+          gt(appointments.endsAt, windowStart),
         ),
       ),
   ]);
 
-  return getAvailableSlots({
+  const slots = getAvailableSlots({
     date,
     timezone: shop.timezone,
     workingHours: hours,
+    overrides,
     service,
-    appointments: dayAppointments,
+    bufferMinutes: bufferFor(service, shop),
+    appointments: nearbyAppointments,
+    now,
+    slotIntervalMinutes: shop.slotIntervalMinutes,
+    minNoticeMinutes: shop.minNoticeMinutes,
+    maxAdvanceDays: shop.maxAdvanceDays,
   });
+
+  const { closed } = hoursOnDate({ date, workingHours: hours, overrides });
+  return { slots, closed };
+}
+
+export async function getSlotsForDay(args: Parameters<typeof getDayAvailability>[0]) {
+  return (await getDayAvailability(args)).slots;
 }
 
 const toUnixSeconds = (date: Date) => Math.floor(date.getTime() / 1000);
@@ -142,27 +200,35 @@ export async function insertAppointmentIfFree(values: {
   customerEmail: string | null;
   startsAt: Date;
   endsAt: Date;
+  /** Gap kept free after this appointment. */
+  bufferMinutes?: number;
   notes: string | null;
   cancelToken: string;
 }) {
   const startsAt = toUnixSeconds(values.startsAt);
   const endsAt = toUnixSeconds(values.endsAt);
+  const bufferMinutes = values.bufferMinutes ?? 0;
+  const blockedUntil = endsAt + bufferMinutes * 60;
 
+  // Each appointment occupies its own time plus its gap; two appointments
+  // conflict when those spans overlap.
   const result = await db.run(sql`
     INSERT INTO appointments (
       id, shop_id, service_id, customer_name, customer_phone, customer_email,
-      starts_at, ends_at, status, notes, cancel_token, reminder_sent_at, created_at
+      starts_at, ends_at, buffer_minutes, status, notes, cancel_token,
+      reminder_sent_at, created_at
     )
     SELECT
       ${values.id}, ${values.shopId}, ${values.serviceId}, ${values.customerName},
       ${values.customerPhone}, ${values.customerEmail}, ${startsAt}, ${endsAt},
-      'confirmed', ${values.notes}, ${values.cancelToken}, NULL, ${toUnixSeconds(new Date())}
+      ${bufferMinutes}, 'confirmed', ${values.notes}, ${values.cancelToken}, NULL,
+      ${toUnixSeconds(new Date())}
     WHERE NOT EXISTS (
       SELECT 1 FROM appointments
       WHERE shop_id = ${values.shopId}
         AND status != 'cancelled'
-        AND starts_at < ${endsAt}
-        AND ends_at > ${startsAt}
+        AND starts_at < ${blockedUntil}
+        AND ends_at + buffer_minutes * 60 > ${startsAt}
     )
   `);
 

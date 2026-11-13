@@ -19,9 +19,16 @@ const TZ = "Europe/Skopje";
 const MONDAY = "2030-01-07";
 const TUESDAY = "2030-01-08";
 
-const shop = { id: "shop_test", timezone: TZ };
-const nightShop = { id: "shop_night", timezone: TZ };
-const service = { id: "svc_test", durationMinutes: 30 };
+// Test dates are years ahead, so the booking window is effectively unlimited.
+const RULES = {
+  slotIntervalMinutes: 15,
+  bufferMinutes: 0,
+  minNoticeMinutes: 0,
+  maxAdvanceDays: 36_500,
+};
+const shop = { id: "shop_test", timezone: TZ, ...RULES };
+const nightShop = { id: "shop_night", timezone: TZ, ...RULES };
+const service = { id: "svc_test", durationMinutes: 30, bufferMinutes: null };
 
 function at(date: string, time: string) {
   return zonedDateTime(date, time, TZ);
@@ -158,6 +165,91 @@ describe("getSlotsForDay", () => {
   });
 });
 
+describe("gaps between appointments", () => {
+  const DAY = "2030-01-14"; // Monday
+
+  it("keeps an existing appointment's gap free", async () => {
+    expect(await book(shop.id, at(DAY, "09:00"), 30, { bufferMinutes: 15 })).toBe(true);
+    expect(await book(shop.id, at(DAY, "09:30"))).toBe(false);
+    expect(await book(shop.id, at(DAY, "09:45"))).toBe(true);
+  });
+
+  it("does not let a new appointment's gap run into the next one", async () => {
+    expect(await book(shop.id, at(DAY, "11:00"))).toBe(true);
+    expect(await book(shop.id, at(DAY, "10:30"), 30, { bufferMinutes: 15 })).toBe(false);
+    expect(await book(shop.id, at(DAY, "10:15"), 30, { bufferMinutes: 15 })).toBe(true);
+  });
+
+  it("leaves gaps out of the offered times", async () => {
+    const date = "2030-01-15";
+    await book(shop.id, at(date, "09:00"), 30, { bufferMinutes: 30 });
+    const slots = await booking.getSlotsForDay({
+      shop,
+      service: { durationMinutes: 30, bufferMinutes: 15 },
+      date,
+    });
+    // 09:00 is taken until 10:00 with its gap; the new 30-minute booking
+    // plus its own 15-minute gap fits from 10:00.
+    expect(slots[0]?.label).toBe("10:00");
+  });
+});
+
+describe("closed days and special hours", () => {
+  beforeAll(async () => {
+    await db.insert(schema.dateOverrides).values([
+      {
+        id: "dto_holiday",
+        shopId: shop.id,
+        startDate: "2030-01-21",
+        endDate: "2030-01-22",
+        startTime: null,
+        endTime: null,
+        label: "Winter break",
+        createdAt: new Date(),
+      },
+      {
+        id: "dto_short",
+        shopId: shop.id,
+        startDate: "2030-01-23",
+        endDate: "2030-01-23",
+        startTime: "10:00",
+        endTime: "11:00",
+        label: null,
+        createdAt: new Date(),
+      },
+    ]);
+  });
+
+  it("offers nothing on a closed day and says why", async () => {
+    for (const date of ["2030-01-21", "2030-01-22"]) {
+      const day = await booking.getDayAvailability({ shop, service, date });
+      expect(day.slots).toEqual([]);
+      expect(day.closed).toEqual({ label: "Winter break" });
+    }
+  });
+
+  it("uses special hours instead of the weekly hours", async () => {
+    const day = await booking.getDayAvailability({ shop, service, date: "2030-01-23" });
+    expect(day.closed).toBeUndefined();
+    expect(day.slots.map((s) => s.label)).toEqual(["10:00", "10:15", "10:30"]);
+  });
+
+  it("goes back to the weekly hours after the override", async () => {
+    const day = await booking.getDayAvailability({ shop, service, date: "2030-01-24" });
+    expect(day.slots[0]?.label).toBe("09:00");
+  });
+
+  it("only applies a shop's overrides to that shop", async () => {
+    const day = await booking.getDayAvailability({
+      shop: nightShop,
+      service,
+      date: "2030-01-22", // a Tuesday, the night shop's open day
+    });
+    expect(day.closed).toBeUndefined();
+    expect(day.slots.length).toBeGreaterThan(0);
+  });
+});
+
 describe("cancelAppointmentByToken", () => {
   async function appointmentWith(startsAt: Date, status = "confirmed") {
     const token = newId("cancel");
@@ -279,6 +371,7 @@ describe("getPublicBookingContext", () => {
     const context = await booking.getPublicBookingContext(shop.id);
     expect(context?.shop.id).toBe(shop.id);
     expect(context?.services.map((s) => s.id)).toEqual([service.id]);
+    expect(context?.lastBookableDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(context?.entitlements.showBadge).toBe(true);
     expect(context?.bookingOpen).toBe(true);
     expect(context?.closedMessage).toBeUndefined();

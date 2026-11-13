@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { WorkingHour } from "@/db/schema";
-import { getAvailableSlots } from "./slots";
+import { getAvailableSlots, hoursOnDate } from "./slots";
 import { zonedDateTime } from "./slots-internal";
 import { acrossServerTimezones, restoreServerTimezone } from "./test-utils";
 
@@ -184,5 +184,145 @@ describe("getAvailableSlots", () => {
     for (const slot of slots) {
       expect(slot.end.getTime() - slot.start.getTime()).toBe(30 * 60 * 1000);
     }
+  });
+});
+
+describe("booking rules", () => {
+  const nineToEleven = hours("09:00", "11:00");
+
+  it("keeps the gap after existing appointments free", () => {
+    expect(
+      getAvailableSlots({
+        date: MONDAY,
+        timezone: SKOPJE,
+        workingHours: nineToEleven,
+        service: { durationMinutes: 30 },
+        appointments: [{ ...appointment(MONDAY, "09:00", "09:30"), bufferMinutes: 15 }],
+        now: NOW,
+        slotIntervalMinutes: 15,
+      }).map((s) => s.label),
+    ).toEqual(["09:45", "10:00", "10:15", "10:30"]);
+  });
+
+  it("keeps the new appointment's own gap clear of the next one", () => {
+    expect(
+      getAvailableSlots({
+        date: MONDAY,
+        timezone: SKOPJE,
+        workingHours: nineToEleven,
+        service: { durationMinutes: 30 },
+        bufferMinutes: 15,
+        appointments: [appointment(MONDAY, "10:00", "10:30")],
+        now: NOW,
+      }).map((s) => s.label),
+    ).toEqual(["09:00", "09:15", "10:30"]);
+  });
+
+  it("lets the last appointment's gap run past closing", () => {
+    expect(
+      getAvailableSlots({
+        date: MONDAY,
+        timezone: SKOPJE,
+        workingHours: hours("09:00", "10:00"),
+        service: { durationMinutes: 60 },
+        bufferMinutes: 30,
+        appointments: [],
+        now: NOW,
+      }).map((s) => s.label),
+    ).toEqual(["09:00"]);
+  });
+
+  it("enforces minimum notice", () => {
+    const now = zonedDateTime(MONDAY, "08:50", SKOPJE);
+    expect(
+      getAvailableSlots({
+        date: MONDAY,
+        timezone: SKOPJE,
+        workingHours: nineToEleven,
+        service: { durationMinutes: 30 },
+        appointments: [],
+        now,
+        minNoticeMinutes: 60,
+      })[0]?.label,
+    ).toBe("10:00");
+  });
+
+  it("stops offering dates past the booking window", () => {
+    const now = zonedDateTime("2026-11-09", "12:00", SKOPJE); // Monday a week before
+    const slotsOn = (date: string, maxAdvanceDays: number) =>
+      getAvailableSlots({
+        date,
+        timezone: SKOPJE,
+        workingHours: nineToEleven,
+        service: { durationMinutes: 30 },
+        appointments: [],
+        now,
+        maxAdvanceDays,
+      }).length;
+    expect(slotsOn(MONDAY, 7)).toBeGreaterThan(0);
+    expect(slotsOn(MONDAY, 6)).toBe(0);
+  });
+});
+
+describe("hoursOnDate", () => {
+  const weekly = hours("09:00", "17:00");
+  const override = (startDate: string, endDate: string, startTime: string | null = null, endTime: string | null = null, label: string | null = null) => ({
+    startDate,
+    endDate,
+    startTime,
+    endTime,
+    label,
+  });
+
+  it("uses the weekly hours with no override", () => {
+    expect(hoursOnDate({ date: MONDAY, workingHours: weekly })).toEqual({
+      ranges: [{ startTime: "09:00", endTime: "17:00" }],
+    });
+  });
+
+  it("closes every date in an inclusive range", () => {
+    const overrides = [override("2026-11-16", "2026-11-18", null, null, "Holiday")];
+    for (const date of ["2026-11-16", "2026-11-17", "2026-11-18"]) {
+      expect(hoursOnDate({ date, workingHours: weekly, overrides })).toEqual({
+        ranges: [],
+        closed: { label: "Holiday" },
+      });
+    }
+    expect(hoursOnDate({ date: "2026-11-19", workingHours: weekly, overrides }).ranges).toHaveLength(1);
+  });
+
+  it("replaces the weekly hours with special hours, even on a normally closed day", () => {
+    const sunday = "2026-11-15";
+    const overrides = [override(sunday, sunday, "10:00", "13:00", "Christmas market")];
+    expect(hoursOnDate({ date: sunday, workingHours: weekly, overrides })).toEqual({
+      ranges: [{ startTime: "10:00", endTime: "13:00" }],
+      special: { label: "Christmas market" },
+    });
+  });
+
+  it("lets a closed override win over special hours", () => {
+    const overrides = [
+      override(MONDAY, MONDAY, "10:00", "12:00"),
+      override("2026-11-10", "2026-11-20"),
+    ];
+    expect(hoursOnDate({ date: MONDAY, workingHours: weekly, overrides }).closed).toBeDefined();
+  });
+
+  it("adds up several special-hours overrides on one date", () => {
+    const overrides = [
+      override(MONDAY, MONDAY, "14:00", "15:00"),
+      override(MONDAY, MONDAY, "09:00", "10:00"),
+    ];
+    expect(
+      getAvailableSlots({
+        date: MONDAY,
+        timezone: SKOPJE,
+        workingHours: weekly,
+        overrides,
+        service: { durationMinutes: 60 },
+        appointments: [],
+        now: NOW,
+      }).map((s) => s.label),
+    ).toEqual(["09:00", "14:00"]);
   });
 });

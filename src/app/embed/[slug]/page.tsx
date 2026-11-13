@@ -26,7 +26,7 @@ export default async function EmbedPage({
   const context = await getPublicBookingContext(slug);
   if (!context) notFound();
 
-  const { shop, services, entitlements, bookingOpen, closedMessage } = context;
+  const { shop, services, entitlements, bookingOpen, closedMessage, lastBookableDate } = context;
   const overrides = entitlements.customTheme ? parseThemeParams(query) : {};
   const requestedService = first(query.service);
   const initialServiceId =
@@ -51,6 +51,7 @@ export default async function EmbedPage({
         shopName={shop.name}
         timezone={shop.timezone}
         services={services}
+        lastBookableDate={lastBookableDate}
         bookingOpen={bookingOpen}
         closedMessage={closedMessage}
         initialServiceId={initialServiceId}

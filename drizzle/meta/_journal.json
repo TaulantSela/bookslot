@@ -15,6 +15,13 @@
       "when": 1794318779121,
       "tag": "0001_shop_plan_and_embed_domains",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1794568622523,
+      "tag": "0002_shop_config",
+      "breakpoints": true
     }
   ]
 }
