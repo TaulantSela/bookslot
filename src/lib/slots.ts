@@ -58,6 +58,35 @@ export function hoursOnDate({
   };
 }
 
+/**
+ * One staff member's hours on a date. The shop's closed days close everyone;
+ * the person's own time off or special hours come next; then the shop's
+ * special hours (they apply to everyone); then their weekly hours, which are
+ * the shop's unless they have their own.
+ */
+export function staffHoursOnDate({
+  date,
+  shopHours,
+  ownHours,
+  shopOverrides = [],
+  ownOverrides = [],
+}: {
+  date: string;
+  shopHours: Pick<WorkingHour, "dayOfWeek" | "startTime" | "endTime">[];
+  /** Null = works the shop's weekly hours. */
+  ownHours: Pick<WorkingHour, "dayOfWeek" | "startTime" | "endTime">[] | null;
+  shopOverrides?: OverrideLike[];
+  ownOverrides?: OverrideLike[];
+}): DayHours {
+  const shopDay = hoursOnDate({ date, workingHours: shopHours, overrides: shopOverrides });
+  if (shopDay.closed) return shopDay;
+
+  const ownDay = hoursOnDate({ date, workingHours: ownHours ?? shopHours, overrides: ownOverrides });
+  if (ownDay.closed || ownDay.special) return ownDay;
+  if (shopDay.special) return shopDay;
+  return ownDay;
+}
+
 /** The last calendar date (shop timezone) customers may book. */
 export function lastBookableDate(timezone: string, maxAdvanceDays: number, now = new Date()) {
   return addDaysToDateString(formatInTimeZone(now, timezone, "yyyy-MM-dd"), maxAdvanceDays);
@@ -69,8 +98,9 @@ type BusyAppointment = Pick<Appointment, "startsAt" | "endsAt" | "status"> &
 export function getAvailableSlots({
   date,
   timezone,
-  workingHours,
+  workingHours = [],
   overrides = [],
+  ranges: givenRanges,
   service,
   bufferMinutes = 0,
   appointments,
@@ -82,8 +112,10 @@ export function getAvailableSlots({
   /** Calendar date in the shop's timezone, as yyyy-MM-dd. */
   date: string;
   timezone: string;
-  workingHours: Pick<WorkingHour, "dayOfWeek" | "startTime" | "endTime">[];
+  workingHours?: Pick<WorkingHour, "dayOfWeek" | "startTime" | "endTime">[];
   overrides?: OverrideLike[];
+  /** Hours already worked out for the date (e.g. staffHoursOnDate); skips workingHours/overrides. */
+  ranges?: HoursRange[];
   service: { durationMinutes: number };
   /** Gap the new appointment keeps free after itself. */
   bufferMinutes?: number;
@@ -99,7 +131,7 @@ export function getAvailableSlots({
     return [];
   }
 
-  const { ranges } = hoursOnDate({ date, workingHours, overrides });
+  const ranges = givenRanges ?? hoursOnDate({ date, workingHours, overrides }).ranges;
   if (ranges.length === 0) return [];
 
   const duration = service.durationMinutes;

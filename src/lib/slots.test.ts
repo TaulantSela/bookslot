@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { WorkingHour } from "@/db/schema";
-import { getAvailableSlots, hoursOnDate } from "./slots";
+import { getAvailableSlots, hoursOnDate, staffHoursOnDate } from "./slots";
 import { zonedDateTime } from "./slots-internal";
 import { acrossServerTimezones, restoreServerTimezone } from "./test-utils";
 
@@ -19,6 +19,7 @@ function hours(
   return days.map((dayOfWeek) => ({
     id: `wh_${dayOfWeek}_${startTime}`,
     shopId: "shop",
+    staffId: null,
     dayOfWeek,
     startTime,
     endTime,
@@ -324,5 +325,66 @@ describe("hoursOnDate", () => {
         now: NOW,
       }).map((s) => s.label),
     ).toEqual(["09:00", "14:00"]);
+  });
+});
+
+describe("staffHoursOnDate", () => {
+  const shopHours = hours("09:00", "17:00");
+  const own = hours("12:00", "20:00");
+  const off = (date: string, label: string | null = null) => ({
+    startDate: date,
+    endDate: date,
+    startTime: null,
+    endTime: null,
+    label,
+  });
+  const special = (date: string, startTime: string, endTime: string) => ({
+    startDate: date,
+    endDate: date,
+    startTime,
+    endTime,
+    label: null,
+  });
+
+  it("uses the shop's hours, or the person's own", () => {
+    expect(staffHoursOnDate({ date: MONDAY, shopHours, ownHours: null }).ranges).toEqual([
+      { startTime: "09:00", endTime: "17:00" },
+    ]);
+    expect(staffHoursOnDate({ date: MONDAY, shopHours, ownHours: own }).ranges).toEqual([
+      { startTime: "12:00", endTime: "20:00" },
+    ]);
+  });
+
+  it("closes everyone on the shop's closed days", () => {
+    expect(
+      staffHoursOnDate({ date: MONDAY, shopHours, ownHours: own, shopOverrides: [off(MONDAY, "Holiday")] }),
+    ).toEqual({ ranges: [], closed: { label: "Holiday" } });
+  });
+
+  it("applies the person's time off and special hours before the shop's special hours", () => {
+    const shopOverrides = [special(MONDAY, "10:00", "14:00")];
+    expect(
+      staffHoursOnDate({ date: MONDAY, shopHours, ownHours: null, shopOverrides, ownOverrides: [off(MONDAY)] }).closed,
+    ).toBeDefined();
+    expect(
+      staffHoursOnDate({
+        date: MONDAY,
+        shopHours,
+        ownHours: null,
+        shopOverrides,
+        ownOverrides: [special(MONDAY, "11:00", "12:00")],
+      }).ranges,
+    ).toEqual([{ startTime: "11:00", endTime: "12:00" }]);
+  });
+
+  it("applies the shop's special hours to people with their own hours", () => {
+    expect(
+      staffHoursOnDate({
+        date: MONDAY,
+        shopHours,
+        ownHours: own,
+        shopOverrides: [special(MONDAY, "10:00", "14:00")],
+      }).ranges,
+    ).toEqual([{ startTime: "10:00", endTime: "14:00" }]);
   });
 });

@@ -1,7 +1,7 @@
 import { desc, eq } from "drizzle-orm";
 import { formatInTimeZone } from "date-fns-tz";
 import { db } from "@/db";
-import { appointments, services } from "@/db/schema";
+import { appointments, services, staff } from "@/db/schema";
 import { getDashboardContext, updateAppointmentStatusAction } from "@/lib/actions";
 import { Button, Card } from "@/components/ui";
 import { redirect } from "next/navigation";
@@ -14,12 +14,16 @@ export default async function AppointmentsPage() {
     .select({
       appointment: appointments,
       serviceName: services.name,
+      staffName: staff.name,
     })
     .from(appointments)
     .innerJoin(services, eq(appointments.serviceId, services.id))
+    .leftJoin(staff, eq(appointments.staffId, staff.id))
     .where(eq(appointments.shopId, ctx.shop.id))
     .orderBy(desc(appointments.startsAt))
     .limit(50);
+
+  const withStaff = rows.some((row) => row.staffName);
 
   return (
     <div className="space-y-6">
@@ -35,6 +39,7 @@ export default async function AppointmentsPage() {
               <tr>
                 <th className="px-4 py-3 font-medium">Customer</th>
                 <th className="px-4 py-3 font-medium">Service</th>
+                {withStaff && <th className="px-4 py-3 font-medium">{ctx.shop.staffLabel}</th>}
                 <th className="px-4 py-3 font-medium">When</th>
                 <th className="px-4 py-3 font-medium">Phone</th>
                 <th className="px-4 py-3 font-medium">Status</th>
@@ -42,12 +47,13 @@ export default async function AppointmentsPage() {
               </tr>
             </thead>
             <tbody>
-              {rows.map(({ appointment, serviceName }) => (
+              {rows.map(({ appointment, serviceName, staffName }) => (
                 <tr key={appointment.id} className="border-t border-zinc-100">
                   <td className="px-4 py-3 font-medium text-zinc-900">
                     {appointment.customerName}
                   </td>
                   <td className="px-4 py-3">{serviceName}</td>
+                  {withStaff && <td className="px-4 py-3">{staffName ?? "—"}</td>}
                   <td className="px-4 py-3">
                     {formatInTimeZone(
                       appointment.startsAt,

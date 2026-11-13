@@ -10,6 +10,8 @@ export async function GET(request: Request) {
   const slug = searchParams.get("slug");
   const serviceId = searchParams.get("serviceId");
   const dateStr = searchParams.get("date");
+  // Optional: one staff member's times instead of anyone's.
+  const staffId = searchParams.get("staffId") || undefined;
 
   if (!slug || !serviceId || !dateStr) {
     return NextResponse.json({ error: "Missing parameters" }, { status: 400 });
@@ -39,7 +41,12 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Service not found" }, { status: 404 });
   }
 
-  const { slots, closed } = await getDayAvailability({ shop, service, date: dateStr });
+  const { slots, closed } = await getDayAvailability({
+    shop,
+    service,
+    date: dateStr,
+    staffId: shop.staffChoice === "choose" ? staffId : undefined,
+  });
 
   return NextResponse.json({
     slots: slots.map((s) => s.label),

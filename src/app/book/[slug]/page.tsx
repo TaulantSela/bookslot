@@ -13,7 +13,7 @@ export default async function BookPage({
   const context = await getPublicBookingContext(slug);
   if (!context) notFound();
 
-  const { shop, services, entitlements, bookingOpen, closedMessage, lastBookableDate } = context;
+  const { shop, services, staff, entitlements, bookingOpen, closedMessage, lastBookableDate } = context;
   const css = buildThemeCss({ shopPrimary: shop.primaryColor, selector: ".bookslot" });
 
   return (
@@ -25,6 +25,9 @@ export default async function BookPage({
         timezone={shop.timezone}
         services={services}
         lastBookableDate={lastBookableDate}
+        staff={staff}
+        staffLabel={shop.staffLabel}
+        staffChoice={shop.staffChoice === "auto" ? "auto" : "choose"}
         bookingOpen={bookingOpen}
         closedMessage={closedMessage}
         badgeHref={entitlements.showBadge ? buildBadgeUrl(shop.slug) : undefined}

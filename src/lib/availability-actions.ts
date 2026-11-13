@@ -1,8 +1,8 @@
 "use server";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { dateOverrides, shops, workingHours } from "@/db/schema";
+import { dateOverrides, shops, staff, workingHours } from "@/db/schema";
 import {
   firstIssue,
   refreshDashboard,
@@ -26,7 +26,10 @@ export async function saveWorkingHoursAction(
     db.insert(workingHours).values({ id: newId("wh"), shopId: shop.id, ...range }),
   );
   await db.batch([
-    db.delete(workingHours).where(eq(workingHours.shopId, shop.id)),
+    // Only the shop's own rows; staff members' hours are saved on their page.
+    db
+      .delete(workingHours)
+      .where(and(eq(workingHours.shopId, shop.id), isNull(workingHours.staffId))),
     ...insert,
   ]);
 
@@ -68,6 +71,15 @@ export async function addDateOverrideAction(
   formData: FormData,
 ): Promise<ActionState> {
   const shop = await requireOwnerShop();
+  // Set when adding time off for one staff member rather than the shop.
+  const staffId = String(formData.get("staffId") ?? "") || null;
+  if (staffId) {
+    const [member] = await db
+      .select({ id: staff.id })
+      .from(staff)
+      .where(and(eq(staff.id, staffId), eq(staff.shopId, shop.id)));
+    if (!member) return { error: "Staff member not found." };
+  }
   const startDate = String(formData.get("startDate") ?? "");
   const closed = formData.get("kind") !== "hours";
   const parsed = dateOverrideSchema.safeParse({
@@ -87,6 +99,7 @@ export async function addDateOverrideAction(
   await db.insert(dateOverrides).values({
     id: newId("dto"),
     shopId: shop.id,
+    staffId,
     startDate: from,
     endDate: to,
     startTime: closed ? null : parsed.data.startTime!,

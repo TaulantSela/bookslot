@@ -1,21 +1,17 @@
-import { and, asc, eq, gte } from "drizzle-orm";
+import { and, asc, eq, gte, isNull } from "drizzle-orm";
 import { formatInTimeZone } from "date-fns-tz";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { dateOverrides, workingHours } from "@/db/schema";
 import { getDashboardContext } from "@/lib/actions";
-import {
-  addDateOverrideAction,
-  deleteDateOverrideAction,
-  saveBookingRulesAction,
-  saveWorkingHoursAction,
-} from "@/lib/availability-actions";
+import { saveBookingRulesAction, saveWorkingHoursAction } from "@/lib/availability-actions";
 import { weeklyHoursFormValues } from "@/lib/hours-form";
 import { formatMinutes } from "@/lib/duration";
 import { ActionForm } from "@/components/action-form";
 import { Select, withCurrent } from "@/components/select";
+import { DateOverrides } from "@/components/date-overrides";
 import { WeeklyHoursFields } from "@/components/weekly-hours-fields";
-import { Button, Card, Input, Label } from "@/components/ui";
+import { Card, Label } from "@/components/ui";
 
 const minutes = (values: number[]) => values.map((value) => ({ value, label: formatMinutes(value) }));
 
@@ -37,12 +33,6 @@ function advanceLabel(days: number) {
   return `${days} days`;
 }
 
-function describeOverride(o: typeof dateOverrides.$inferSelect) {
-  const days = o.startDate === o.endDate ? o.startDate : `${o.startDate} → ${o.endDate}`;
-  const what = o.startTime && o.endTime ? `Open ${o.startTime}–${o.endTime}` : "Closed";
-  return { days, what };
-}
-
 export default async function AvailabilityPage() {
   const ctx = await getDashboardContext();
   if (!ctx?.shop) redirect("/login");
@@ -50,11 +40,20 @@ export default async function AvailabilityPage() {
   const today = formatInTimeZone(new Date(), shop.timezone, "yyyy-MM-dd");
 
   const [hours, overrides] = await Promise.all([
-    db.select().from(workingHours).where(eq(workingHours.shopId, shop.id)),
+    db
+      .select()
+      .from(workingHours)
+      .where(and(eq(workingHours.shopId, shop.id), isNull(workingHours.staffId))),
     db
       .select()
       .from(dateOverrides)
-      .where(and(eq(dateOverrides.shopId, shop.id), gte(dateOverrides.endDate, today)))
+      .where(
+        and(
+          eq(dateOverrides.shopId, shop.id),
+          isNull(dateOverrides.staffId),
+          gte(dateOverrides.endDate, today),
+        ),
+      )
       .orderBy(asc(dateOverrides.startDate)),
   ]);
 
@@ -134,61 +133,7 @@ export default async function AvailabilityPage() {
           Holidays, vacations or a day with different hours. These replace the weekly hours on those dates.
         </p>
 
-        {overrides.length > 0 && (
-          <ul className="mt-4 divide-y divide-zinc-100 rounded-lg border border-zinc-200">
-            {overrides.map((o) => {
-              const { days, what } = describeOverride(o);
-              return (
-                <li key={o.id} className="flex items-center justify-between gap-4 px-4 py-3 text-sm">
-                  <div>
-                    <span className="font-medium text-zinc-900">{days}</span>
-                    <span className="text-zinc-600"> · {what}</span>
-                    {o.label && <span className="text-zinc-500"> · {o.label}</span>}
-                  </div>
-                  <form action={deleteDateOverrideAction.bind(null, o.id)}>
-                    <Button type="submit" variant="ghost" className="px-2 py-1 text-xs">
-                      Remove
-                    </Button>
-                  </form>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-
-        <ActionForm
-          action={addDateOverrideAction}
-          submitLabel="Add"
-          resetOnSuccess
-          className="mt-4 grid gap-4 md:grid-cols-4"
-        >
-          <div>
-            <Label htmlFor="startDate">From</Label>
-            <Input id="startDate" name="startDate" type="date" min={today} required />
-          </div>
-          <div>
-            <Label htmlFor="endDate">To (optional)</Label>
-            <Input id="endDate" name="endDate" type="date" min={today} />
-          </div>
-          <div className="md:col-span-2">
-            <Label htmlFor="label">Note for clients (optional)</Label>
-            <Input id="label" name="label" placeholder="Public holiday" maxLength={80} />
-          </div>
-          <fieldset className="md:col-span-4">
-            <legend className="mb-1.5 text-sm font-medium text-zinc-700">On those days</legend>
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm text-zinc-700">
-              <label className="flex items-center gap-2">
-                <input type="radio" name="kind" value="closed" defaultChecked /> Closed
-              </label>
-              <label className="flex items-center gap-2">
-                <input type="radio" name="kind" value="hours" /> Open from
-              </label>
-              <Input name="startTime" type="time" defaultValue="10:00" className="w-32" aria-label="Opens at" />
-              <span>to</span>
-              <Input name="endTime" type="time" defaultValue="14:00" className="w-32" aria-label="Closes at" />
-            </div>
-          </fieldset>
-        </ActionForm>
+        <DateOverrides overrides={overrides} today={today} />
       </Card>
     </div>
   );

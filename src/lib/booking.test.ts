@@ -185,7 +185,7 @@ describe("gaps between appointments", () => {
     await book(shop.id, at(date, "09:00"), 30, { bufferMinutes: 30 });
     const slots = await booking.getSlotsForDay({
       shop,
-      service: { durationMinutes: 30, bufferMinutes: 15 },
+      service: { id: service.id, durationMinutes: 30, bufferMinutes: 15 },
       date,
     });
     // 09:00 is taken until 10:00 with its gap; the new 30-minute booking
@@ -247,6 +247,135 @@ describe("closed days and special hours", () => {
     });
     expect(day.closed).toBeUndefined();
     expect(day.slots.length).toBeGreaterThan(0);
+  });
+});
+
+describe("staff", () => {
+  const STAFF_SHOP = "shop_staff";
+  const DAY = "2030-02-04"; // Monday
+  const HAIRCUT = "svc_staff_haircut";
+  const COLOR = "svc_staff_color";
+  let createBooking: typeof import("./create-booking").createBooking;
+  let staffShop: typeof schema.shops.$inferSelect;
+
+  const customer = { name: "Client", phone: "070000000", email: null, notes: null };
+
+  beforeAll(async () => {
+    ({ createBooking } = await import("./create-booking"));
+    await db.insert(schema.shops).values({
+      id: STAFF_SHOP,
+      userId: "usr_test",
+      slug: STAFF_SHOP,
+      name: "Staff shop",
+      timezone: TZ,
+      plan: "pro",
+      staffLabel: "Barber",
+      ...RULES,
+      createdAt: new Date(),
+    });
+    await db.insert(schema.services).values([
+      { id: HAIRCUT, shopId: STAFF_SHOP, name: "Haircut", durationMinutes: 30 },
+      { id: COLOR, shopId: STAFF_SHOP, name: "Color", durationMinutes: 60 },
+    ]);
+    await db.insert(schema.staff).values([
+      // Ana: shop hours, every service. Ben: only haircuts, own hours 10–11.
+      { id: "stf_ana", shopId: STAFF_SHOP, name: "Ana", sortOrder: 0, createdAt: new Date() },
+      {
+        id: "stf_ben",
+        shopId: STAFF_SHOP,
+        name: "Ben",
+        sortOrder: 1,
+        serviceIds: [HAIRCUT],
+        useShopHours: false,
+        createdAt: new Date(),
+      },
+      { id: "stf_gone", shopId: STAFF_SHOP, name: "Gone", active: false, createdAt: new Date() },
+    ]);
+    await db.insert(schema.workingHours).values([
+      { id: "wh_staff_shop", shopId: STAFF_SHOP, dayOfWeek: 1, startTime: "09:00", endTime: "12:00" },
+      { id: "wh_staff_ben", shopId: STAFF_SHOP, staffId: "stf_ben", dayOfWeek: 1, startTime: "10:00", endTime: "11:00" },
+    ]);
+    [staffShop] = await db.select().from(schema.shops).where(eq(schema.shops.id, STAFF_SHOP));
+  });
+
+  const availability = (serviceId: string, date: string, staffId?: string) =>
+    booking.getDayAvailability({
+      shop: staffShop,
+      service: { id: serviceId, durationMinutes: serviceId === COLOR ? 60 : 30, bufferMinutes: null },
+      date,
+      staffId,
+    });
+
+  it("offers each slot with the people free for it", async () => {
+    const { slots } = await availability(HAIRCUT, DAY);
+    const at10 = slots.find((s) => s.label === "10:00");
+    expect(slots[0]).toMatchObject({ label: "09:00", staffIds: ["stf_ana"] });
+    expect(at10?.staffIds.sort()).toEqual(["stf_ana", "stf_ben"]);
+  });
+
+  it("only uses people who offer the service", async () => {
+    const { slots } = await availability(COLOR, DAY);
+    expect(new Set(slots.flatMap((s) => s.staffIds))).toEqual(new Set(["stf_ana"]));
+  });
+
+  it("gives one person's times when asked", async () => {
+    const { slots } = await availability(HAIRCUT, DAY, "stf_ben");
+    expect(slots.map((s) => s.label)).toEqual(["10:00", "10:15", "10:30"]);
+  });
+
+  it("books the same time with different people, then refuses", async () => {
+    const first = await createBooking({ shop: staffShop, serviceId: HAIRCUT, date: DAY, time: "10:00", customer });
+    const second = await createBooking({ shop: staffShop, serviceId: HAIRCUT, date: DAY, time: "10:00", customer });
+    const third = await createBooking({ shop: staffShop, serviceId: HAIRCUT, date: DAY, time: "10:00", customer });
+
+    expect("booking" in first && "booking" in second).toBe(true);
+    const people = [first, second].map((r) => ("booking" in r ? r.booking.staffName : null));
+    expect(people.sort()).toEqual(["Ana", "Ben"]);
+    expect(third).toMatchObject({ code: "slot_taken" });
+  });
+
+  it("assigns the least busy person when the client picks anyone", async () => {
+    const date = "2030-02-25"; // Monday
+    const ana = await createBooking({ shop: staffShop, serviceId: HAIRCUT, date, time: "09:00", staffId: "stf_ana", customer });
+    expect("booking" in ana && ana.booking.staffName).toBe("Ana");
+    // Both are free at 10:00; Ana already has a booking that day, Ben none.
+    const anyone = await createBooking({ shop: staffShop, serviceId: HAIRCUT, date, time: "10:00", customer });
+    expect("booking" in anyone && anyone.booking.staffName).toBe("Ben");
+  });
+
+  it("refuses a person who doesn't offer the service, or is hidden", async () => {
+    expect(
+      await createBooking({ shop: staffShop, serviceId: COLOR, date: DAY, time: "09:00", staffId: "stf_ben", customer }),
+    ).toMatchObject({ code: "staff_unavailable" });
+    expect(
+      await createBooking({ shop: staffShop, serviceId: HAIRCUT, date: DAY, time: "09:00", staffId: "stf_gone", customer }),
+    ).toMatchObject({ code: "staff_unavailable" });
+  });
+
+  it("applies time off to that person only", async () => {
+    const date = "2030-02-11";
+    await db.insert(schema.dateOverrides).values({
+      id: "dto_ben_off",
+      shopId: STAFF_SHOP,
+      staffId: "stf_ben",
+      startDate: date,
+      endDate: date,
+      label: "Vacation",
+      createdAt: new Date(),
+    });
+    const ben = await availability(HAIRCUT, date, "stf_ben");
+    expect(ben.slots).toEqual([]);
+    expect(ben.closed).toEqual({ label: "Vacation" });
+    const anyone = await availability(HAIRCUT, date);
+    expect(anyone.closed).toBeUndefined();
+    expect(new Set(anyone.slots.flatMap((s) => s.staffIds))).toEqual(new Set(["stf_ana"]));
+  });
+
+  it("treats an unassigned appointment as blocking everyone", async () => {
+    const date = "2030-02-18";
+    expect(await book(STAFF_SHOP, at(date, "10:00"), 30, { serviceId: HAIRCUT })).toBe(true);
+    const { slots } = await availability(HAIRCUT, date);
+    expect(slots.find((s) => s.label === "10:00")).toBeUndefined();
   });
 });
 

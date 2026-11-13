@@ -38,6 +38,10 @@ export const shops = sqliteTable("shops", {
   minNoticeMinutes: integer("min_notice_minutes").notNull().default(0),
   /** How many days ahead customers can book (today counts as day 0). */
   maxAdvanceDays: integer("max_advance_days").notNull().default(90),
+  /** What customers see staff called, e.g. "Barber", "Dentist", "Room". */
+  staffLabel: text("staff_label").notNull().default("Staff member"),
+  /** "choose": customers may pick a staff member or "Anyone". "auto": always assigned for them. */
+  staffChoice: text("staff_choice").notNull().default("choose"),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
 });
 
@@ -56,11 +60,32 @@ export const services = sqliteTable("services", {
   sortOrder: integer("sort_order").notNull().default(0),
 });
 
+/**
+ * People or resources (chairs, rooms) that take bookings. A shop with no
+ * active staff works as a single calendar, as before staff existed.
+ */
+export const staff = sqliteTable("staff", {
+  id: text("id").primaryKey(),
+  shopId: text("shop_id")
+    .notNull()
+    .references(() => shops.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  active: integer("active", { mode: "boolean" }).notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  /** Services this person offers. Null = every service. */
+  serviceIds: text("service_ids", { mode: "json" }).$type<string[]>(),
+  /** True: works the shop's weekly hours. False: their own rows in working_hours. */
+  useShopHours: integer("use_shop_hours", { mode: "boolean" }).notNull().default(true),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+});
+
 export const workingHours = sqliteTable("working_hours", {
   id: text("id").primaryKey(),
   shopId: text("shop_id")
     .notNull()
     .references(() => shops.id, { onDelete: "cascade" }),
+  /** Null = the shop's hours; set = that staff member's own hours. */
+  staffId: text("staff_id").references(() => staff.id, { onDelete: "cascade" }),
   dayOfWeek: integer("day_of_week").notNull(),
   startTime: text("start_time").notNull(),
   endTime: text("end_time").notNull(),
@@ -76,6 +101,8 @@ export const dateOverrides = sqliteTable("date_overrides", {
   shopId: text("shop_id")
     .notNull()
     .references(() => shops.id, { onDelete: "cascade" }),
+  /** Null = the whole shop; set = one staff member's time off or special hours. */
+  staffId: text("staff_id").references(() => staff.id, { onDelete: "cascade" }),
   /** yyyy-MM-dd, inclusive. */
   startDate: text("start_date").notNull(),
   /** yyyy-MM-dd, inclusive. */
@@ -96,6 +123,8 @@ export const appointments = sqliteTable("appointments", {
   serviceId: text("service_id")
     .notNull()
     .references(() => services.id),
+  /** Who the appointment is with. Null in shops without staff. */
+  staffId: text("staff_id").references(() => staff.id),
   customerName: text("customer_name").notNull(),
   customerPhone: text("customer_phone").notNull(),
   customerEmail: text("customer_email"),
@@ -117,6 +146,7 @@ export const usersRelations = relations(users, ({ many }) => ({
 export const shopsRelations = relations(shops, ({ one, many }) => ({
   user: one(users, { fields: [shops.userId], references: [users.id] }),
   services: many(services),
+  staff: many(staff),
   workingHours: many(workingHours),
   dateOverrides: many(dateOverrides),
   appointments: many(appointments),
@@ -124,6 +154,13 @@ export const shopsRelations = relations(shops, ({ one, many }) => ({
 
 export const servicesRelations = relations(services, ({ one, many }) => ({
   shop: one(shops, { fields: [services.shopId], references: [shops.id] }),
+  appointments: many(appointments),
+}));
+
+export const staffRelations = relations(staff, ({ one, many }) => ({
+  shop: one(shops, { fields: [staff.shopId], references: [shops.id] }),
+  workingHours: many(workingHours),
+  dateOverrides: many(dateOverrides),
   appointments: many(appointments),
 }));
 
@@ -146,6 +183,7 @@ export const appointmentsRelations = relations(appointments, ({ one }) => ({
 export type User = typeof users.$inferSelect;
 export type Shop = typeof shops.$inferSelect;
 export type Service = typeof services.$inferSelect;
+export type Staff = typeof staff.$inferSelect;
 export type WorkingHour = typeof workingHours.$inferSelect;
 export type DateOverride = typeof dateOverrides.$inferSelect;
 export type Appointment = typeof appointments.$inferSelect;

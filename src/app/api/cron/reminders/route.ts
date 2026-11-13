@@ -2,7 +2,7 @@ import { and, eq, gte, isNull, lte } from "drizzle-orm";
 import { addHours } from "date-fns";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { appointments, services, shops } from "@/db/schema";
+import { appointments, services, shops, staff } from "@/db/schema";
 import { buildCancelUrl, sendReminderEmail } from "@/lib/email";
 
 export async function GET(request: Request) {
@@ -30,10 +30,12 @@ export async function GET(request: Request) {
       appointment: appointments,
       shop: shops,
       service: services,
+      staffName: staff.name,
     })
     .from(appointments)
     .innerJoin(shops, eq(appointments.shopId, shops.id))
     .innerJoin(services, eq(appointments.serviceId, services.id))
+    .leftJoin(staff, eq(appointments.staffId, staff.id))
     .where(
       and(
         eq(appointments.status, "confirmed"),
@@ -59,6 +61,7 @@ export async function GET(request: Request) {
       customerName: row.appointment.customerName,
       shopName: row.shop.name,
       serviceName: row.service.name,
+      staffName: row.staffName,
       startsAt: row.appointment.startsAt,
       endsAt: row.appointment.endsAt,
       timezone: row.shop.timezone,

@@ -6,6 +6,7 @@ const links = [
   { href: "/dashboard/appointments", label: "Appointments" },
   { href: "/dashboard/services", label: "Services" },
   { href: "/dashboard/hours", label: "Availability" },
+  { href: "/dashboard/staff", label: "Staff" },
   { href: "/dashboard/embed", label: "Widget" },
   { href: "/dashboard/settings", label: "Settings" },
 ];

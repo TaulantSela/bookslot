@@ -91,6 +91,7 @@ export const dateOverrideSchema = z
 export const bookingSchema = z.object({
   shopSlug: z.string().min(1),
   serviceId: z.string().min(1),
+  staffId: z.string().max(40).optional(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   time: z.string().regex(/^\d{2}:\d{2}$/),
   customerName: z.string().min(2).max(80),

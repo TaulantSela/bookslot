@@ -19,6 +19,7 @@ Works anywhere: each shop picks its own time zone and currency.
 | Closed days and special hours for a date or a range of dates | Availability |
 | Start-time step, gap after appointments, minimum notice, how far ahead | Availability → Booking rules |
 | Per-service duration, price and its own gap | Services |
+| Staff or resources (chairs, rooms): their services, own hours, time off; clients pick one or "Anyone", or staff are assigned automatically | Staff |
 
 ## Quick start
 
@@ -181,7 +182,6 @@ src/
 
 - Viber/SMS reminders via Akton or Infobip
 - Stripe / local payment deposits
-- Multi-staff scheduling
 - Albanian language UI
 - Mobile app for shop owners
 
