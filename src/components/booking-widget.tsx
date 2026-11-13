@@ -352,10 +352,12 @@ export function BookingWidget({
       ) {
         chooseService(data.service);
       }
+      // "" picks "Anyone"; an id picks that person if they offer the service.
       if (
         staffChoice === "choose" &&
         typeof data.staff === "string" &&
-        staff.some((m) => m.id === data.staff && offers(m, selection.current.serviceId))
+        (data.staff === "" ||
+          staff.some((m) => m.id === data.staff && offers(m, selection.current.serviceId)))
       ) {
         chooseStaff(data.staff);
       }

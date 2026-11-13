@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
-import { services } from "@/db/schema";
+import { services, staff } from "@/db/schema";
 import { Card } from "@/components/ui";
 import { EmbedDomainsForm } from "@/components/embed-domains-form";
 import { getDashboardContext } from "@/lib/actions";
@@ -38,7 +38,7 @@ export default async function EmbedPage() {
   // The address @bookslot/react uses when no bookslotUrl is passed. (Not
   // imported: that package is a client module, so a server component would
   // get a client reference instead of the string.)
-  const packageDefaultUrl = "https://bookslot-rho.vercel.app";
+  const packageDefaultUrl = "https://bookslot.taulantsela.com";
   const plan = entitlementsFor(shop.plan);
   const isPro = shop.plan === "pro";
   const used = await monthlyBookingCount(shop);
@@ -47,6 +47,11 @@ export default async function EmbedPage() {
     .from(services)
     .where(eq(services.shopId, shop.id))
     .orderBy(services.sortOrder);
+  const staffList = await db
+    .select({ id: staff.id, name: staff.name, active: staff.active })
+    .from(staff)
+    .where(eq(staff.shopId, shop.id))
+    .orderBy(staff.sortOrder, staff.createdAt);
   const salesEmail = process.env.NEXT_PUBLIC_SALES_EMAIL;
   const proTag = isPro ? "" : " (Pro)";
 
@@ -118,6 +123,8 @@ export function Booking({ user }) {
             <Feature on={plan.customTheme}>Match your site: colors, radius, font, dark mode</Feature>
             <Feature on={plan.prefill}>Preselect a service and prefill customer details</Feature>
             <Feature on={plan.hostEvents}>Booking events for your site (analytics, redirects)</Feature>
+            <Feature on={plan.customFields}>Your own questions on the booking form</Feature>
+            <Feature on={plan.api}>API and webhooks for your own systems</Feature>
           </ul>
           {!isPro && (
             <p className="mt-4 text-sm text-zinc-600">
@@ -168,28 +175,33 @@ export function Booking({ user }) {
       />
       <Snippet
         title="4 · React / Next.js"
-        note="Install the @bookslot/react package. Works in Next.js, Vite and Remix. Callbacks like onBooked need a client component. Theme, service, customer and onBooked need Pro."
+        note="Install the @bookslot/react package. Works in Next.js, Vite and Remix. Callbacks like onBooked need a client component. Theme, service, staff, customer and onBooked need Pro."
         code={reactCode}
       />
       <Card>
-        <h2 className="font-medium text-zinc-900">Service IDs{proTag}</h2>
+        <h2 className="font-medium text-zinc-900">IDs for preselecting{proTag}</h2>
         <p className="mt-1 text-sm text-zinc-600">
-          Pass one as <code>service</code> (or <code>data-service</code>) to open the widget on that service.
+          Pass a service as <code>service</code> (or <code>data-service</code>) and a {shop.staffLabel.toLowerCase()} as{" "}
+          <code>staff</code> (or <code>data-staff</code>) to open the widget on them.
         </p>
-        {serviceList.length ? (
+        {serviceList.length === 0 && staffList.length === 0 ? (
+          <p className="mt-3 text-sm text-zinc-500">Add services first.</p>
+        ) : (
           <ul className="mt-3 divide-y divide-zinc-100 text-sm">
-            {serviceList.map((s) => (
-              <li key={s.id} className="flex items-center justify-between gap-4 py-2">
-                <span className={s.active ? "text-zinc-800" : "text-zinc-400"}>
-                  {s.name}
-                  {s.active ? "" : " (hidden)"}
+            {[
+              ...serviceList.map((s) => ({ ...s, kind: "Service" })),
+              ...staffList.map((s) => ({ ...s, kind: shop.staffLabel })),
+            ].map((item) => (
+              <li key={item.id} className="flex items-center justify-between gap-4 py-2">
+                <span className={item.active ? "text-zinc-800" : "text-zinc-400"}>
+                  <span className="text-zinc-400">{item.kind} · </span>
+                  {item.name}
+                  {item.active ? "" : " (hidden)"}
                 </span>
-                <code className="rounded bg-zinc-100 px-2 py-0.5 text-xs">{s.id}</code>
+                <code className="rounded bg-zinc-100 px-2 py-0.5 text-xs">{item.id}</code>
               </li>
             ))}
           </ul>
-        ) : (
-          <p className="mt-3 text-sm text-zinc-500">Add services first.</p>
         )}
       </Card>
 
