@@ -5,6 +5,7 @@ import {
   cancelAppointmentByToken,
   getAppointmentByCancelToken,
 } from "@/lib/booking";
+import { emitCustomerCancellation } from "@/lib/appointment-status";
 import { formatAppointmentRange } from "@/lib/slots";
 import { CancelStatusCard, contactShopText } from "./status-card";
 
@@ -18,7 +19,12 @@ export default async function CancelPage({
 
   async function confirm() {
     "use server";
-    await cancelAppointmentByToken(token);
+    // Looked up again rather than closing over `row`, which Next would
+    // serialize into the page for the action.
+    const current = await getAppointmentByCancelToken(token);
+    if (current && (await cancelAppointmentByToken(token))) {
+      await emitCustomerCancellation(current.appointment);
+    }
     redirect(`/cancel/${encodeURIComponent(token)}/done`);
   }
 

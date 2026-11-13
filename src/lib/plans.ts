@@ -20,6 +20,8 @@ export type Entitlements = {
   hostEvents: boolean;
   /** Custom questions on the booking form. (Showing/hiding the standard fields is free.) */
   customFields: boolean;
+  /** Public API keys and webhooks. */
+  api: boolean;
 };
 
 export const PLAN_ENTITLEMENTS: Record<Plan, Entitlements> = {
@@ -30,6 +32,7 @@ export const PLAN_ENTITLEMENTS: Record<Plan, Entitlements> = {
     prefill: false,
     hostEvents: false,
     customFields: false,
+    api: false,
   },
   pro: {
     monthlyBookingLimit: null,
@@ -38,6 +41,7 @@ export const PLAN_ENTITLEMENTS: Record<Plan, Entitlements> = {
     prefill: true,
     hostEvents: true,
     customFields: true,
+    api: true,
   },
 };
 

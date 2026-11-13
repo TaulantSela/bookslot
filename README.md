@@ -101,6 +101,12 @@ It's a client component: an App Router server component can render it with plain
 
 Copy exact codes from **Dashboard → Widget** after signing up. [`examples/`](examples/README.md) has two complete host sites: plain HTML on the Free plan and Next.js on the Pro plan.
 
+## API and webhooks (Pro)
+
+Create a key under **Dashboard → Developers** and call `https://<your BookSlot>/api/v1` from your server with `Authorization: Bearer bsk_…`: shop, services, staff, form fields, availability (up to 14 days at a time), and appointments (list, create, get, cancel/complete). Bookings made through the API pass the same checks as the widget.
+
+Webhook URLs get `appointment.created`, `appointment.cancelled` and `appointment.completed`, signed with HMAC-SHA256 (`BookSlot-Signature: t=…,v1=…`). Failed deliveries retry with backoff: right after the next event for that shop, and from the daily cron. Full reference: `/docs/api`.
+
 ## Plans
 
 Defined in `src/lib/plans.ts` and enforced on the server, so a host page can't unlock paid options by editing its embed code.
@@ -113,6 +119,7 @@ Defined in `src/lib/plans.ts` and enforced on the server, so a host page can't u
 | Theme overrides (colors, radius, font, dark mode) | — | ✓ |
 | Preselect service, prefill customer | — | ✓ |
 | Custom questions on the booking form | — | ✓ |
+| Public API (`/api/v1`) and signed webhooks | — | ✓ |
 | `booked` / `error` events to the host page | — | ✓ |
 
 There is no payment integration: invoice the customer, then set the plan by hand.

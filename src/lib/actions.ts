@@ -4,7 +4,6 @@ import { and, eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
 import {
-  appointments,
   services,
   shops,
   users,
@@ -19,7 +18,9 @@ import {
   verifyPassword,
   getUserByEmail,
 } from "@/lib/auth";
+import { setAppointmentStatus } from "@/lib/appointment-status";
 import { createBooking, type BookingResult } from "@/lib/create-booking";
+import { emitAppointmentEvent } from "@/lib/webhooks";
 import {
   firstIssue,
   refreshDashboard,
@@ -216,9 +217,12 @@ export async function createBookingAction(
     ),
   });
 
+  if (!("booking" in result)) return { error: result.error };
+  await emitAppointmentEvent(shop, "appointment.created", result.booking.appointmentId);
+
   // Returned rather than redirected, so the widget can confirm inline (the
   // customer stays inside the embed) and tell the host page about it.
-  return "booking" in result ? { booking: result.booking } : { error: result.error };
+  return { booking: result.booking };
 }
 
 export async function saveEmbedDomainsAction(
@@ -357,14 +361,7 @@ export async function updateAppointmentStatusAction(
   status: "confirmed" | "cancelled" | "completed",
 ) {
   const shop = await requireOwnerShop();
-
-  await db
-    .update(appointments)
-    .set({ status })
-    .where(
-      and(eq(appointments.id, appointmentId), eq(appointments.shopId, shop.id)),
-    );
-
+  await setAppointmentStatus(shop, appointmentId, status);
   refreshDashboard();
 }
 
