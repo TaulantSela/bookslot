@@ -1,7 +1,6 @@
 "use server";
 
 import { and, eq } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
 import {
@@ -17,19 +16,26 @@ import {
   getSession,
   getUserShop,
   hashPassword,
-  requireUserShop,
   verifyPassword,
   getUserByEmail,
 } from "@/lib/auth";
 import {
+  bufferFor,
   getSlotsForDay,
   insertAppointmentIfFree,
   isAcceptingOnlineBookings,
   noOnlineBookingsMessage,
 } from "@/lib/booking";
+import {
+  firstIssue,
+  refreshDashboard,
+  requireOwnerShop,
+  type ActionState,
+} from "@/lib/dashboard";
 import { buildCancelUrl, sendBookingConfirmation } from "@/lib/email";
 import { MAX_EMBED_DOMAINS, parseEmbedDomains } from "@/lib/embed";
 import { newId, slugify } from "@/lib/id";
+import { guessCurrency } from "@/lib/regional";
 import { formatAppointmentRange } from "@/lib/slots";
 import { isValidDateString } from "@/lib/slots-internal";
 import {
@@ -38,13 +44,9 @@ import {
   registerSchema,
   serviceSchema,
   shopSettingsSchema,
-  workingHourSchema,
 } from "@/lib/validation";
 
-export type ActionState = {
-  error?: string;
-  success?: string;
-};
+export type { ActionState };
 
 export type BookingResult = {
   appointmentId: string;
@@ -58,12 +60,6 @@ export type BookingResult = {
 
 export type BookingActionState = ActionState & { booking?: BookingResult };
 
-// Dashboard pages read straight from the database, so every dashboard
-// mutation refreshes them; otherwise the UI keeps showing the old values.
-function refreshDashboard() {
-  revalidatePath("/dashboard", "layout");
-}
-
 export async function registerAction(
   _prev: ActionState,
   formData: FormData,
@@ -73,6 +69,8 @@ export async function registerAction(
     email: formData.get("email"),
     password: formData.get("password"),
     shopName: formData.get("shopName"),
+    timezone: formData.get("timezone") || undefined,
+    currency: formData.get("currency") || undefined,
   });
 
   if (!parsed.success) {
@@ -80,6 +78,8 @@ export async function registerAction(
   }
 
   const { name, email, password, shopName } = parsed.data;
+  const timezone = parsed.data.timezone ?? "Europe/Skopje";
+  const currency = parsed.data.currency ?? guessCurrency(timezone);
 
   const existing = await getUserByEmail(email);
   if (existing) {
@@ -116,7 +116,8 @@ export async function registerAction(
     name: shopName,
     description: null,
     primaryColor: "#2563eb",
-    timezone: "Europe/Skopje",
+    timezone,
+    currency,
     phone: null,
     address: null,
     reminderHoursBefore: 24,
@@ -252,6 +253,7 @@ export async function createBookingAction(
     customerEmail: data.customerEmail || null,
     startsAt: slot.start,
     endsAt: slot.end,
+    bufferMinutes: bufferFor(service, shop),
     notes: data.notes || null,
     cancelToken,
   });
@@ -289,9 +291,7 @@ export async function saveEmbedDomainsAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const session = await getSession();
-  if (!session) redirect("/login");
-  const shop = await requireUserShop(session.userId);
+  const shop = await requireOwnerShop();
 
   const { domains, invalid } = parseEmbedDomains(
     String(formData.get("domains") ?? ""),
@@ -317,52 +317,59 @@ export async function saveEmbedDomainsAction(
   };
 }
 
-export async function saveServiceAction(formData: FormData) {
-  const session = await getSession();
-  if (!session) redirect("/login");
-
-  const shop = await requireUserShop(session.userId);
+export async function saveServiceAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const shop = await requireOwnerShop();
   const parsed = serviceSchema.safeParse({
     name: formData.get("name"),
     durationMinutes: formData.get("durationMinutes"),
-    price: formData.get("price") || undefined,
+    price: formData.get("price"),
+    bufferMinutes: formData.get("bufferMinutes"),
   });
 
-  if (!parsed.success) return;
+  if (!parsed.success) {
+    return {
+      error: firstIssue(
+        parsed.error,
+        "Check the name, a duration of 5–480 minutes and a gap of 0–240 minutes.",
+      ),
+    };
+  }
 
-  // The form takes whole currency units (e.g. 800 MKD); the database stores cents.
+  // The form takes whole currency units (e.g. 800 MKD); the database stores hundredths.
   const priceCents =
     parsed.data.price == null ? null : Math.round(parsed.data.price * 100);
-  const serviceId = formData.get("serviceId") as string | null;
+  const values = {
+    name: parsed.data.name,
+    durationMinutes: parsed.data.durationMinutes,
+    priceCents,
+    bufferMinutes: parsed.data.bufferMinutes ?? null,
+  };
+  const serviceId = formData.get("serviceId");
 
-  if (serviceId) {
+  if (typeof serviceId === "string" && serviceId) {
     await db
       .update(services)
-      .set({
-        name: parsed.data.name,
-        durationMinutes: parsed.data.durationMinutes,
-        priceCents,
-      })
+      .set(values)
       .where(and(eq(services.id, serviceId), eq(services.shopId, shop.id)));
   } else {
     await db.insert(services).values({
       id: newId("svc"),
       shopId: shop.id,
-      name: parsed.data.name,
-      durationMinutes: parsed.data.durationMinutes,
-      priceCents,
+      ...values,
       active: true,
       sortOrder: 99,
     });
   }
 
   refreshDashboard();
+  return { success: serviceId ? "Service saved." : `Added ${values.name}.` };
 }
 
 export async function toggleServiceAction(serviceId: string, active: boolean) {
-  const session = await getSession();
-  if (!session) redirect("/login");
-  const shop = await requireUserShop(session.userId);
+  const shop = await requireOwnerShop();
 
   await db
     .update(services)
@@ -372,45 +379,11 @@ export async function toggleServiceAction(serviceId: string, active: boolean) {
   refreshDashboard();
 }
 
-export async function saveWorkingHoursAction(formData: FormData) {
-  const session = await getSession();
-  if (!session) redirect("/login");
-  const shop = await requireUserShop(session.userId);
-
-  await db.delete(workingHours).where(eq(workingHours.shopId, shop.id));
-
-  const entries: (typeof workingHours.$inferInsert)[] = [];
-
-  for (let day = 0; day <= 6; day++) {
-    const enabled = formData.get(`day_${day}_enabled`) === "on";
-    if (!enabled) continue;
-
-    const parsed = workingHourSchema.safeParse({
-      dayOfWeek: day,
-      startTime: formData.get(`day_${day}_start`),
-      endTime: formData.get(`day_${day}_end`),
-    });
-
-    if (!parsed.success) continue;
-
-    entries.push({
-      id: newId("wh"),
-      shopId: shop.id,
-      ...parsed.data,
-    });
-  }
-
-  if (entries.length > 0) {
-    await db.insert(workingHours).values(entries);
-  }
-
-  refreshDashboard();
-}
-
-export async function saveShopSettingsAction(formData: FormData) {
-  const session = await getSession();
-  if (!session) redirect("/login");
-  const shop = await requireUserShop(session.userId);
+export async function saveShopSettingsAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const shop = await requireOwnerShop();
 
   const parsed = shopSettingsSchema.safeParse({
     name: formData.get("name"),
@@ -419,9 +392,13 @@ export async function saveShopSettingsAction(formData: FormData) {
     address: formData.get("address"),
     primaryColor: formData.get("primaryColor"),
     reminderHoursBefore: formData.get("reminderHoursBefore"),
+    timezone: formData.get("timezone"),
+    currency: formData.get("currency"),
   });
 
-  if (!parsed.success) return;
+  if (!parsed.success) {
+    return { error: firstIssue(parsed.error, "Please check the highlighted details.") };
+  }
 
   await db
     .update(shops)
@@ -432,19 +409,20 @@ export async function saveShopSettingsAction(formData: FormData) {
       address: parsed.data.address || null,
       primaryColor: parsed.data.primaryColor,
       reminderHoursBefore: parsed.data.reminderHoursBefore,
+      timezone: parsed.data.timezone,
+      currency: parsed.data.currency,
     })
     .where(eq(shops.id, shop.id));
 
   refreshDashboard();
+  return { success: "Settings saved." };
 }
 
 export async function updateAppointmentStatusAction(
   appointmentId: string,
   status: "confirmed" | "cancelled" | "completed",
 ) {
-  const session = await getSession();
-  if (!session) redirect("/login");
-  const shop = await requireUserShop(session.userId);
+  const shop = await requireOwnerShop();
 
   await db
     .update(appointments)
@@ -454,15 +432,6 @@ export async function updateAppointmentStatusAction(
     );
 
   refreshDashboard();
-}
-
-export async function getShopBySlug(slug: string) {
-  const [shop] = await db
-    .select()
-    .from(shops)
-    .where(eq(shops.slug, slug))
-    .limit(1);
-  return shop ?? null;
 }
 
 export async function getDashboardContext() {

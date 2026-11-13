@@ -1,15 +1,38 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { registerAction, type ActionState } from "@/lib/actions";
+import { guessCurrency } from "@/lib/regional";
+import { Select } from "@/components/select";
 import { Button, Card, Input, Label } from "@/components/ui";
 
-export function RegisterForm() {
+const FALLBACK_TIMEZONE = "Europe/Skopje";
+
+export function RegisterForm({
+  timezones,
+  currencies,
+}: {
+  timezones: string[];
+  currencies: { value: string; label: string }[];
+}) {
   const [state, formAction, pending] = useActionState<ActionState, FormData>(
     registerAction,
     {},
   );
+  const [timezone, setTimezone] = useState(FALLBACK_TIMEZONE);
+  const [currency, setCurrency] = useState(guessCurrency(FALLBACK_TIMEZONE));
+  const [currencyTouched, setCurrencyTouched] = useState(false);
+
+  // Detected after mount, so the server render and hydration match.
+  useEffect(() => {
+    const detected = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (detected && timezones.includes(detected)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-off browser detection
+      setTimezone(detected);
+      setCurrency(guessCurrency(detected));
+    }
+  }, [timezones]);
 
   return (
     <Card className="w-full max-w-md">
@@ -26,6 +49,34 @@ export function RegisterForm() {
         <div>
           <Label htmlFor="shopName">Business name</Label>
           <Input id="shopName" name="shopName" placeholder="Ana Beauty Salon" required />
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <Label htmlFor="timezone">Time zone</Label>
+            <Select
+              id="timezone"
+              name="timezone"
+              value={timezone}
+              onChange={(e) => {
+                setTimezone(e.target.value);
+                if (!currencyTouched) setCurrency(guessCurrency(e.target.value));
+              }}
+              options={timezones.map((tz) => ({ value: tz, label: tz.replaceAll("_", " ") }))}
+            />
+          </div>
+          <div>
+            <Label htmlFor="currency">Currency</Label>
+            <Select
+              id="currency"
+              name="currency"
+              value={currency}
+              onChange={(e) => {
+                setCurrency(e.target.value);
+                setCurrencyTouched(true);
+              }}
+              options={currencies}
+            />
+          </div>
         </div>
         <div>
           <Label htmlFor="email">Email</Label>

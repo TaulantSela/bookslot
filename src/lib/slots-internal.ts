@@ -34,11 +34,22 @@ export function dayOfWeek(dateStr: string) {
   return toUtcDate(dateStr).getUTCDay();
 }
 
+/** The calendar date `days` after (or before, if negative) a yyyy-MM-dd date. */
+export function addDaysToDateString(dateStr: string, days: number) {
+  const date = toUtcDate(dateStr);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
 /** The calendar date one day after a yyyy-MM-dd date. */
 export function nextDateString(dateStr: string) {
-  const date = toUtcDate(dateStr);
-  date.setUTCDate(date.getUTCDate() + 1);
-  return date.toISOString().slice(0, 10);
+  return addDaysToDateString(dateStr, 1);
+}
+
+/** Minutes since midnight of an HH:mm time. */
+export function minutesOfDay(time: string) {
+  const [hours, minutes] = time.split(":").map(Number);
+  return hours * 60 + minutes;
 }
 
 /** The instant at which a wall-clock time on a calendar date occurs in `timezone`. */

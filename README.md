@@ -8,7 +8,17 @@ Each business gets:
 - A **dashboard** to manage services, hours, and appointments
 - **Email reminders** to reduce no-shows
 
-Built for North Macedonia (timezone: Europe/Skopje) but works anywhere.
+Works anywhere: each shop picks its own time zone and currency.
+
+## What a shop can configure
+
+| Setting | Where |
+|---|---|
+| Time zone and currency (any IANA zone, any ISO 4217 code) | Settings (detected at sign-up) |
+| Weekly hours, with an optional break per day | Availability |
+| Closed days and special hours for a date or a range of dates | Availability |
+| Start-time step, gap after appointments, minimum notice, how far ahead | Availability → Booking rules |
+| Per-service duration, price and its own gap | Services |
 
 ## Quick start
 

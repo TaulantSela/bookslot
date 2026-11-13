@@ -18,7 +18,10 @@ export const shops = sqliteTable("shops", {
   name: text("name").notNull(),
   description: text("description"),
   primaryColor: text("primary_color").notNull().default("#2563eb"),
+  /** IANA timezone; working hours and closed days are wall-clock times in it. */
   timezone: text("timezone").notNull().default("Europe/Skopje"),
+  /** ISO 4217 code. Prices are stored in hundredths of it (see src/lib/money.ts). */
+  currency: text("currency").notNull().default("MKD"),
   phone: text("phone"),
   address: text("address"),
   reminderHoursBefore: integer("reminder_hours_before").notNull().default(24),
@@ -26,6 +29,15 @@ export const shops = sqliteTable("shops", {
   plan: text("plan").notNull().default("free"),
   /** Sites allowed to embed the widget (CSP frame-ancestors). Null or empty = any site. */
   embedDomains: text("embed_domains", { mode: "json" }).$type<string[]>(),
+  // Booking rules (src/lib/slots.ts).
+  /** Start times are offered every N minutes. */
+  slotIntervalMinutes: integer("slot_interval_minutes").notNull().default(15),
+  /** Gap kept free after every appointment, unless its service sets its own. */
+  bufferMinutes: integer("buffer_minutes").notNull().default(0),
+  /** Bookings must start at least this many minutes from now. */
+  minNoticeMinutes: integer("min_notice_minutes").notNull().default(0),
+  /** How many days ahead customers can book (today counts as day 0). */
+  maxAdvanceDays: integer("max_advance_days").notNull().default(90),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
 });
 
@@ -36,7 +48,10 @@ export const services = sqliteTable("services", {
     .references(() => shops.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   durationMinutes: integer("duration_minutes").notNull(),
+  /** Hundredths of the shop's currency. */
   priceCents: integer("price_cents"),
+  /** Gap after this service. Null = the shop's default. */
+  bufferMinutes: integer("buffer_minutes"),
   active: integer("active", { mode: "boolean" }).notNull().default(true),
   sortOrder: integer("sort_order").notNull().default(0),
 });
@@ -49,6 +64,28 @@ export const workingHours = sqliteTable("working_hours", {
   dayOfWeek: integer("day_of_week").notNull(),
   startTime: text("start_time").notNull(),
   endTime: text("end_time").notNull(),
+});
+
+/**
+ * Exceptions to the weekly hours for a run of calendar dates (shop timezone):
+ * closed (no times) or open with special hours. Several rows with hours on
+ * the same date add up; a closed row wins over everything.
+ */
+export const dateOverrides = sqliteTable("date_overrides", {
+  id: text("id").primaryKey(),
+  shopId: text("shop_id")
+    .notNull()
+    .references(() => shops.id, { onDelete: "cascade" }),
+  /** yyyy-MM-dd, inclusive. */
+  startDate: text("start_date").notNull(),
+  /** yyyy-MM-dd, inclusive. */
+  endDate: text("end_date").notNull(),
+  /** HH:mm. Both null = closed. */
+  startTime: text("start_time"),
+  endTime: text("end_time"),
+  /** Shown to customers, e.g. "Public holiday". */
+  label: text("label"),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
 });
 
 export const appointments = sqliteTable("appointments", {
@@ -64,6 +101,8 @@ export const appointments = sqliteTable("appointments", {
   customerEmail: text("customer_email"),
   startsAt: integer("starts_at", { mode: "timestamp" }).notNull(),
   endsAt: integer("ends_at", { mode: "timestamp" }).notNull(),
+  /** Gap kept free after this appointment, fixed when it was booked. */
+  bufferMinutes: integer("buffer_minutes").notNull().default(0),
   status: text("status").notNull().default("confirmed"),
   notes: text("notes"),
   cancelToken: text("cancel_token").notNull().unique(),
@@ -79,6 +118,7 @@ export const shopsRelations = relations(shops, ({ one, many }) => ({
   user: one(users, { fields: [shops.userId], references: [users.id] }),
   services: many(services),
   workingHours: many(workingHours),
+  dateOverrides: many(dateOverrides),
   appointments: many(appointments),
 }));
 
@@ -89,6 +129,10 @@ export const servicesRelations = relations(services, ({ one, many }) => ({
 
 export const workingHoursRelations = relations(workingHours, ({ one }) => ({
   shop: one(shops, { fields: [workingHours.shopId], references: [shops.id] }),
+}));
+
+export const dateOverridesRelations = relations(dateOverrides, ({ one }) => ({
+  shop: one(shops, { fields: [dateOverrides.shopId], references: [shops.id] }),
 }));
 
 export const appointmentsRelations = relations(appointments, ({ one }) => ({
@@ -103,4 +147,5 @@ export type User = typeof users.$inferSelect;
 export type Shop = typeof shops.$inferSelect;
 export type Service = typeof services.$inferSelect;
 export type WorkingHour = typeof workingHours.$inferSelect;
+export type DateOverride = typeof dateOverrides.$inferSelect;
 export type Appointment = typeof appointments.$inferSelect;
