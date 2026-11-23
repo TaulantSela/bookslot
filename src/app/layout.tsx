@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "BookSlot — Online booking widget for local businesses",
+  title: "BookSlot — Booking page and widget for any business",
   description:
-    "Let clients book appointments online. Embeddable widget, reminders, and schedule management for salons, dentists, and service businesses.",
+    "Let clients book appointments online. A booking page, embeddable widget, reminders and schedule management for any business that sells its time.",
 };
 
 export default function RootLayout({
