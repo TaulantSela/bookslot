@@ -18,7 +18,7 @@ export default function HomePage() {
 
       <section className="mx-auto max-w-6xl px-4 py-20">
         <div className="max-w-2xl">
-          <p className="text-sm font-medium text-blue-600">For salons, dentists, mechanics & more</p>
+          <p className="text-sm font-medium text-blue-600">For any business that sells its time</p>
           <h1 className="mt-3 text-5xl font-semibold tracking-tight text-zinc-900">
             Let clients book online. Stop answering calls all day.
           </h1>
