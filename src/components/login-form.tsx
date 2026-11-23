@@ -12,18 +12,18 @@ export function LoginForm() {
   );
 
   return (
-    <Card className="w-full max-w-md">
+    <Card className="w-full max-w-md p-8">
       <h1 className="text-2xl font-semibold text-zinc-900">Log in</h1>
       <p className="mt-1 text-sm text-zinc-600">Manage your booking widget</p>
 
       <form action={formAction} className="mt-6 space-y-4">
         <div>
           <Label htmlFor="email">Email</Label>
-          <Input id="email" name="email" type="email" required />
+          <Input id="email" name="email" type="email" autoComplete="email" required />
         </div>
         <div>
           <Label htmlFor="password">Password</Label>
-          <Input id="password" name="password" type="password" required />
+          <Input id="password" name="password" type="password" autoComplete="current-password" required />
         </div>
         {state.error && (
           <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -37,7 +37,7 @@ export function LoginForm() {
 
       <p className="mt-4 text-center text-sm text-zinc-600">
         No account?{" "}
-        <Link href="/register" className="text-blue-600 hover:underline">
+        <Link href="/register" className="text-brand-600 hover:underline">
           Start free
         </Link>
       </p>

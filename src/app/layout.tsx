@@ -12,10 +12,16 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const title = "BookSlot — Booking page and widget for any business";
+const description =
+  "Let clients book appointments online. A booking page, embeddable widget, reminders and schedule management for any business that sells its time.";
+
 export const metadata: Metadata = {
-  title: "BookSlot — Booking page and widget for any business",
-  description:
-    "Let clients book appointments online. A booking page, embeddable widget, reminders and schedule management for any business that sells its time.",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"),
+  // Pages set a short title ("Log in") and get " · BookSlot" appended.
+  title: { default: title, template: "%s · BookSlot" },
+  description,
+  openGraph: { title, description, siteName: "BookSlot", type: "website" },
 };
 
 export default function RootLayout({
