@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { and, asc, count, eq, gte, isNotNull, isNull } from "drizzle-orm";
 import { formatInTimeZone } from "date-fns-tz";
 import { redirect } from "next/navigation";
@@ -18,6 +19,8 @@ import { DateOverrides } from "@/components/date-overrides";
 import { Select } from "@/components/select";
 import { WeeklyHoursFields } from "@/components/weekly-hours-fields";
 import { Button, Card, Input, Label } from "@/components/ui";
+
+export const metadata: Metadata = { title: "Staff" };
 
 export default async function StaffPage() {
   const ctx = await getDashboardContext();
@@ -164,7 +167,7 @@ export default async function StaffPage() {
             </div>
 
             <details className="mt-4 border-t border-zinc-100 pt-3">
-              <summary className="cursor-pointer text-sm text-blue-600">Edit services and hours</summary>
+              <summary className="cursor-pointer text-sm text-brand-600">Edit services and hours</summary>
               <ActionForm action={saveStaffAction} submitLabel={`Save ${member.name}`} className="mt-4 space-y-5">
                 <input type="hidden" name="staffId" value={member.id} />
                 <div className="max-w-sm">
@@ -215,7 +218,7 @@ export default async function StaffPage() {
             </details>
 
             <details className="mt-3 border-t border-zinc-100 pt-3">
-              <summary className="cursor-pointer text-sm text-blue-600">Time off</summary>
+              <summary className="cursor-pointer text-sm text-brand-600">Time off</summary>
               <p className="mt-2 text-sm text-zinc-500">
                 Vacation, sick days or different hours for {member.name}. The shop&apos;s closed days
                 (Availability) apply to everyone.

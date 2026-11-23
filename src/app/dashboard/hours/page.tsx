@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { and, asc, eq, gte, isNull } from "drizzle-orm";
 import { formatInTimeZone } from "date-fns-tz";
 import { redirect } from "next/navigation";
@@ -32,6 +33,8 @@ function advanceLabel(days: number) {
   if (days % 7 === 0 && days < 60) return `${days / 7} week${days === 7 ? "" : "s"}`;
   return `${days} days`;
 }
+
+export const metadata: Metadata = { title: "Availability" };
 
 export default async function AvailabilityPage() {
   const ctx = await getDashboardContext();

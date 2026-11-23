@@ -35,7 +35,7 @@ export function RegisterForm({
   }, [timezones]);
 
   return (
-    <Card className="w-full max-w-md">
+    <Card className="w-full max-w-md p-8">
       <h1 className="text-2xl font-semibold text-zinc-900">Start free</h1>
       <p className="mt-1 text-sm text-zinc-600">
         Create your booking page in under 2 minutes
@@ -44,11 +44,11 @@ export function RegisterForm({
       <form action={formAction} className="mt-6 space-y-4">
         <div>
           <Label htmlFor="name">Your name</Label>
-          <Input id="name" name="name" required />
+          <Input id="name" name="name" autoComplete="name" required />
         </div>
         <div>
           <Label htmlFor="shopName">Business name</Label>
-          <Input id="shopName" name="shopName" placeholder="Ana Beauty Salon" required />
+          <Input id="shopName" name="shopName" placeholder="Ana Beauty Salon" autoComplete="organization" required />
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
@@ -80,11 +80,11 @@ export function RegisterForm({
         </div>
         <div>
           <Label htmlFor="email">Email</Label>
-          <Input id="email" name="email" type="email" required />
+          <Input id="email" name="email" type="email" autoComplete="email" required />
         </div>
         <div>
           <Label htmlFor="password">Password</Label>
-          <Input id="password" name="password" type="password" minLength={8} required />
+          <Input id="password" name="password" type="password" minLength={8} autoComplete="new-password" required />
         </div>
         {state.error && (
           <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -98,7 +98,7 @@ export function RegisterForm({
 
       <p className="mt-4 text-center text-sm text-zinc-600">
         Already have an account?{" "}
-        <Link href="/login" className="text-blue-600 hover:underline">
+        <Link href="/login" className="text-brand-600 hover:underline">
           Log in
         </Link>
       </p>

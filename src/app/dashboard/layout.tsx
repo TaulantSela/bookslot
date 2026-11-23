@@ -13,7 +13,7 @@ export default async function DashboardLayout({
 
   return (
     <div className="min-h-screen bg-zinc-50">
-      <DashboardNav shopName={ctx.shop.name} />
+      <DashboardNav shopName={ctx.shop.name} shopSlug={ctx.shop.slug} />
       <main className="mx-auto max-w-6xl px-4 py-8">{children}</main>
     </div>
   );

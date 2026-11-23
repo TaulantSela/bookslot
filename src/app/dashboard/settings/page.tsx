@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { formatInTimeZone } from "date-fns-tz";
 import { redirect } from "next/navigation";
 import { getDashboardContext, saveShopSettingsAction } from "@/lib/actions";
@@ -5,6 +6,8 @@ import { currencyLabel, listCurrencies, listTimeZones } from "@/lib/regional";
 import { ActionForm } from "@/components/action-form";
 import { Select } from "@/components/select";
 import { Card, Input, Label, Textarea } from "@/components/ui";
+
+export const metadata: Metadata = { title: "Settings" };
 
 export default async function SettingsPage() {
   const ctx = await getDashboardContext();

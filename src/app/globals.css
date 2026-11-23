@@ -4,3 +4,42 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
+
+/* Brand colour: the indigo from the app icon (src/app/icon.svg). Change it
+   here and every `brand-*` utility follows. */
+@theme {
+  --color-brand-50: oklch(96.2% 0.018 272.314);
+  --color-brand-100: oklch(93% 0.034 272.788);
+  --color-brand-200: oklch(87% 0.065 274.039);
+  --color-brand-300: oklch(78.5% 0.115 274.713);
+  --color-brand-400: oklch(67.3% 0.182 276.935);
+  --color-brand-500: oklch(58.5% 0.233 277.117);
+  --color-brand-600: oklch(51.1% 0.262 276.966);
+  --color-brand-700: oklch(45.7% 0.24 277.023);
+  --color-brand-800: oklch(39.8% 0.195 277.366);
+  --color-brand-900: oklch(35.9% 0.144 278.697);
+  --color-brand-950: oklch(25.7% 0.09 281.288);
+}
+
+/* The arrow on <Select> (src/components/select.tsx), which drops the native one. */
+@utility select-chevron {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%2371717a' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+  background-position: right 0.6rem center;
+  background-repeat: no-repeat;
+  background-size: 1.1rem;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+/* Section anchors land below the sticky site header. */
+[id] {
+  scroll-margin-top: 5rem;
+}

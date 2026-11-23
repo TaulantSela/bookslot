@@ -33,6 +33,9 @@ yarn-error.log*
 # database
 /data/
 
+# scratch frames from scripts/record-demo.mts
+/.demo-recording/
+
 # env files (can opt-in for committing if needed)
 .env*
 !.env.example
