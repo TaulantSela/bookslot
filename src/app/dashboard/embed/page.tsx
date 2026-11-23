@@ -1,8 +1,10 @@
+import type { Metadata } from "next";
 import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { services, staff } from "@/db/schema";
 import { Card } from "@/components/ui";
+import { EmbedPreview } from "@/components/embed-preview";
 import { EmbedDomainsForm } from "@/components/embed-domains-form";
 import { getDashboardContext } from "@/lib/actions";
 import { monthlyBookingCount } from "@/lib/booking";
@@ -28,6 +30,8 @@ function Feature({ on, children }: { on: boolean; children: React.ReactNode }) {
     </li>
   );
 }
+
+export const metadata: Metadata = { title: "Widget" };
 
 export default async function EmbedPage() {
   const ctx = await getDashboardContext();
@@ -130,7 +134,7 @@ export function Booking({ user }) {
             <p className="mt-4 text-sm text-zinc-600">
               Want the Pro options?{" "}
               {salesEmail ? (
-                <a href={`mailto:${salesEmail}?subject=BookSlot Pro for ${shop.slug}`} className="text-blue-600 hover:underline">
+                <a href={`mailto:${salesEmail}?subject=BookSlot Pro for ${shop.slug}`} className="text-brand-600 hover:underline">
                   Ask us to upgrade
                 </a>
               ) : (
@@ -213,11 +217,9 @@ export function Booking({ user }) {
 
       <Card>
         <h2 className="font-medium text-zinc-900">Live preview</h2>
-        <iframe
-          src={buildEmbedUrl(shop.slug)}
-          className="mt-4 h-[760px] w-full max-w-md rounded-2xl border border-zinc-200"
-          title="Booking widget preview"
-        />
+        <div className="mt-4">
+          <EmbedPreview src={buildEmbedUrl(shop.slug)} />
+        </div>
       </Card>
     </div>
   );

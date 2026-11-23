@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { formatInTimeZone } from "date-fns-tz";
 import Link from "next/link";
@@ -43,6 +44,8 @@ const STATUS_STYLE: Record<string, string> = {
   failed: "text-red-700",
 };
 
+export const metadata: Metadata = { title: "Developers" };
+
 export default async function DevelopersPage() {
   const ctx = await getDashboardContext();
   if (!ctx?.shop) redirect("/login");
@@ -78,7 +81,7 @@ export default async function DevelopersPage() {
             when bookings change.
           </p>
         </div>
-        <Link href="/docs/api" className="text-sm text-blue-600 hover:underline">
+        <Link href="/docs/api" className="text-sm text-brand-600 hover:underline">
           API reference →
         </Link>
       </div>
@@ -160,7 +163,7 @@ export default async function DevelopersPage() {
                   </div>
                 </div>
                 <details className="mt-3">
-                  <summary className="cursor-pointer text-sm text-blue-600">Signing secret and events</summary>
+                  <summary className="cursor-pointer text-sm text-brand-600">Signing secret and events</summary>
                   <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
                     <code className="break-all rounded bg-zinc-100 px-2 py-1 text-xs">{endpoint.secret}</code>
                     <form action={rotateWebhookSecretAction.bind(null, endpoint.id)}>

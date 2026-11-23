@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { asc, eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
@@ -70,6 +71,8 @@ function QuestionFields({ field }: { field?: FormField }) {
     </>
   );
 }
+
+export const metadata: Metadata = { title: "Booking form" };
 
 export default async function BookingFormPage() {
   const ctx = await getDashboardContext();
@@ -172,7 +175,7 @@ export default async function BookingFormPage() {
                       </div>
                     </div>
                     <details className="mt-2">
-                      <summary className="cursor-pointer text-sm text-blue-600">Edit</summary>
+                      <summary className="cursor-pointer text-sm text-brand-600">Edit</summary>
                       <ActionForm
                         action={saveQuestionAction}
                         submitLabel="Save question"

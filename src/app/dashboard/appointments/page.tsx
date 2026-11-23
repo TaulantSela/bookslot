@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { desc, eq } from "drizzle-orm";
 import { formatInTimeZone } from "date-fns-tz";
 import { db } from "@/db";
@@ -6,6 +7,8 @@ import { getDashboardContext, updateAppointmentStatusAction } from "@/lib/action
 import { formatAnswer } from "@/lib/booking-form";
 import { Button, Card } from "@/components/ui";
 import { redirect } from "next/navigation";
+
+export const metadata: Metadata = { title: "Appointments" };
 
 export default async function AppointmentsPage() {
   const ctx = await getDashboardContext();
@@ -54,7 +57,7 @@ export default async function AppointmentsPage() {
                     <div className="font-medium text-zinc-900">{appointment.customerName}</div>
                     {(appointment.customerEmail || appointment.notes || appointment.answers?.length) && (
                       <details className="mt-1 text-xs text-zinc-600">
-                        <summary className="cursor-pointer text-blue-600">Details</summary>
+                        <summary className="cursor-pointer text-brand-600">Details</summary>
                         <dl className="mt-1 space-y-0.5">
                           {appointment.customerEmail && (
                             <div>

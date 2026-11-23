@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
@@ -65,6 +66,8 @@ function ServiceFields({
   );
 }
 
+export const metadata: Metadata = { title: "Services" };
+
 export default async function ServicesPage() {
   const ctx = await getDashboardContext();
   if (!ctx?.shop) redirect("/login");
@@ -108,7 +111,7 @@ export default async function ServicesPage() {
                 </form>
               </div>
               <details className="mt-4 border-t border-zinc-100 pt-3">
-                <summary className="cursor-pointer text-sm text-blue-600">Edit</summary>
+                <summary className="cursor-pointer text-sm text-brand-600">Edit</summary>
                 <ActionForm
                   action={saveServiceAction}
                   submitLabel="Save service"
