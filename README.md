@@ -161,6 +161,7 @@ To deploy on Vercel, import the repo, set these variables with a Turso database 
 | `npm run db:setup` | Migrate + seed the demo shop (`db:migrate` and `db:seed` run them separately) |
 | `npm run example:pro` | Next.js example site on port 3001 (see [`examples/`](examples/README.md)) |
 | `npm run build:react` | Build `@bookslot/react` into `packages/react/dist` |
+| `npm run demo:record -- http://localhost:3000` | Re-record the looping booking video on `/demo` (`public/demo/`) with Chrome and ffmpeg, against a local build on a scratch database; steps in [`scripts/record-demo.mts`](scripts/record-demo.mts) |
 
 CI (`.github/workflows/test.yml`) type-checks, lints, tests and builds the React package on pull requests and pushes to `main`.
 
