@@ -1,14 +1,10 @@
-# BookSlot
+# 📅 BookSlot
 
-Online appointment booking widget for local service businesses — salons, barbers, dentists, mechanics, tutors.
+Online appointment booking for any business that sells its time: barbers, dentists, salons, tutors, mechanics, physios. Each business gets a public booking page, an embeddable widget and a dashboard for its services, hours, staff and appointments. Clients pick a free time and get an email confirmation and reminder.
 
-Each business gets:
-- A **public booking page** (`/book/your-shop`)
-- An **embeddable widget** (iframe or script tag)
-- A **dashboard** to manage services, hours, and appointments
-- **Email reminders** to reduce no-shows
+**▶ [Try it live →](https://bookslot.taulantsela.com)** — or open the [demo sites](https://bookslot.taulantsela.com/demo): a barbershop on the Free plan and a dental clinic on Pro.
 
-Works anywhere: each shop picks its own time zone and currency.
+Taking bookings by phone and DM means answering calls all day. BookSlot gives a business a link for its Instagram, Google Maps or Viber bio, and one line of HTML for its website. The widget can match the host site's look, prefill its signed-in user and report bookings back to it, while the plan rules stay on BookSlot's server, so editing the embed code can't unlock paid options.
 
 ## What a shop can configure
 
@@ -22,46 +18,30 @@ Works anywhere: each shop picks its own time zone and currency.
 | Staff or resources (chairs, rooms): their services, own hours, time off; clients pick one or "Anyone", or staff are assigned automatically | Staff |
 | Phone, email and notes: required, optional or hidden | Booking form |
 | Custom questions (text, long text, number, dropdown, checkbox, date) — Pro | Booking form |
+| Sites allowed to embed the widget | Widget |
+| Brand colour, reminder timing | Settings |
 
-## Quick start
+Clients who leave an email get a confirmation and a reminder, each with a link to cancel. Two clients can't take the same time: a booking is inserted only if no overlapping appointment exists, gaps included.
 
-```bash
-npm install
-cp .env.example .env.local
-npm run db:setup
-npm run dev
-```
+## Embed it
 
-Open [http://localhost:3000](http://localhost:3000)
+Copy exact codes from **Dashboard → Widget** after signing up. [`examples/`](examples/README.md) has two complete host sites: plain HTML on the Free plan and Next.js on Pro.
 
-### Demo account
+**Booking link:** `https://bookslot.taulantsela.com/book/your-shop-slug`
 
-| | |
-|---|---|
-| Email | `demo@bookslot.mk` |
-| Password | `demo12345` |
-| Booking page | [/book/demo-salon](http://localhost:3000/book/demo-salon) |
-| Embed widget | [/embed/demo-salon](http://localhost:3000/embed/demo-salon) |
-| Demo websites | [/demo](http://localhost:3000/demo) (run `scripts/seed-examples.ts` first) |
+**One line of HTML** (mounts right after the script tag and resizes itself):
 
-## Embed on any website
-
-**Booking link** (Instagram, Google Maps, Viber bio):
-```
-https://your-domain.com/book/your-shop-slug
-```
-
-**One line of HTML** (mounts right after the script tag, resizes itself):
 ```html
-<script src="https://your-domain.com/widget.js" data-shop="your-shop-slug" async></script>
+<script src="https://bookslot.taulantsela.com/widget.js" data-shop="your-shop-slug" async></script>
 ```
 
-Style options (Pro): `data-primary`, `data-background`, `data-text` (hex colors), `data-radius` (0–32), `data-font` (`sans`, `system`, `serif`, `mono`), `data-scheme` (`light`, `dark`, `auto`). Also `data-height` (initial height) and `data-max-width`. The older `widget.js?shop=…` form still works.
+Optional attributes: `data-height` (initial height) and `data-max-width`; on Pro also `data-primary`, `data-background`, `data-text` (hex colours), `data-radius` (0–32), `data-font` (`sans`, `system`, `serif`, `mono`), `data-scheme` (`light`, `dark`, `auto`), and `data-service` / `data-staff` to preselect. The older `widget.js?shop=…` form still works.
 
 **JavaScript API**, for apps:
+
 ```html
 <div id="booking"></div>
-<script src="https://your-domain.com/widget.js"></script>
+<script src="https://bookslot.taulantsela.com/widget.js"></script>
 <script>
   const widget = BookSlot.mount("#booking", {
     shop: "your-shop-slug",
@@ -70,131 +50,126 @@ Style options (Pro): `data-primary`, `data-background`, `data-text` (hex colors)
     prefill: { name: "Arta", email: "arta@example.com", phone: "070123456" }, // Pro
     onBooked: (booking) => console.log(booking.appointmentId, booking.when), // Pro
   });
-  // widget.prefill({...}), widget.on("booked", fn), widget.destroy()
+  // widget.prefill({...}), widget.on("booked", fn), widget.off(...), widget.destroy()
 </script>
 ```
 
 Events: `ready` and `resize` on every plan; `booked` and `error` on Pro. They arrive as callbacks (`onReady`, `onResize`, `onBooked`, `onError` or `widget.on(...)`) and as bubbling DOM events (`bookslot:booked`, …) on the mount element. Booking events are only posted to the origin that mounted the widget, and prefilled details travel by `postMessage`, never in the URL.
 
-**React / Next.js**: the [`@bookslot/react`](packages/react) package wraps the same script with typed props:
+**React / Next.js:** [`@bookslot/react`](packages/react) wraps the same script with typed props.
+
 ```bash
 npm install @bookslot/react
 ```
+
 ```tsx
 import { BookSlotWidget } from "@bookslot/react";
 
 <BookSlotWidget
   shop="your-shop-slug"
-  theme={{ primary: "#2dd4bf", scheme: "dark" }}   // Pro
+  theme={{ primary: "#2dd4bf", scheme: "dark" }}    // Pro
+  staff="stf_…"                                     // Pro: preselect, "" = anyone
   customer={{ name: user.name, email: user.email }} // Pro
   onBooked={(booking) => console.log(booking.when)} // Pro
 />
 ```
-It's a client component: an App Router server component can render it with plain props, and callbacks like `onBooked` go in a client component. It points at the hosted BookSlot by default; pass `bookslotUrl` for a self-hosted one.
+
+It's a client component: an App Router server component can render it with plain props, and callbacks like `onBooked` go in a client component. It points at the hosted BookSlot by default; pass `bookslotUrl` for a self-hosted one. All props: [packages/react/README.md](packages/react/README.md).
 
 **Plain iframe** (no JavaScript, no resizing or events):
+
 ```html
-<iframe src="https://your-domain.com/embed/your-shop-slug" width="100%" height="760" style="border:0;max-width:480px" title="Book an appointment"></iframe>
+<iframe src="https://bookslot.taulantsela.com/embed/your-shop-slug" width="100%" height="760" style="border:0;max-width:480px" title="Book an appointment"></iframe>
 ```
 
 **Allowed websites:** in **Dashboard → Widget**, owners can list the sites allowed to embed their widget (sent as CSP `frame-ancestors`). Empty means any site. Every other page refuses to be framed.
 
-Copy exact codes from **Dashboard → Widget** after signing up. [`examples/`](examples/README.md) has two complete host sites: plain HTML on the Free plan and Next.js on the Pro plan.
-
 ## API and webhooks (Pro)
 
-Create a key under **Dashboard → Developers** and call `https://<your BookSlot>/api/v1` from your server with `Authorization: Bearer bsk_…`: shop, services, staff, form fields, availability (up to 14 days at a time), and appointments (list, create, get, cancel/complete). Bookings made through the API pass the same checks as the widget.
+Create a key under **Dashboard → Developers** and call `/api/v1` from your server with `Authorization: Bearer bsk_…`:
 
-Webhook URLs get `appointment.created`, `appointment.cancelled` and `appointment.completed`, signed with HMAC-SHA256 (`BookSlot-Signature: t=…,v1=…`). Failed deliveries retry with backoff: right after the next event for that shop, and from the daily cron. Full reference: `/docs/api`.
+| Endpoint | |
+|---|---|
+| `GET /api/v1/shop`, `/services`, `/staff`, `/form-fields` | The shop and what can be booked |
+| `GET /api/v1/availability` | Free times, up to 14 days per request |
+| `GET`, `POST /api/v1/appointments` | List or create bookings (same checks as the widget) |
+| `GET`, `PATCH /api/v1/appointments/:id` | Read one, or set its `status` to `cancelled`, `completed` or `confirmed` |
+
+Up to five webhook URLs per shop receive `appointment.created`, `appointment.cancelled` and `appointment.completed`, signed with HMAC-SHA256 (`BookSlot-Signature: t=…,v1=…`). Failed deliveries retry with backoff: when the shop's next event is sent, and from the daily cron. In production, webhook URLs must be public `https` addresses. Full reference: [`/docs/api`](https://bookslot.taulantsela.com/docs/api).
 
 ## Plans
 
-Defined in `src/lib/plans.ts` and enforced on the server, so a host page can't unlock paid options by editing its embed code.
+Defined in `src/lib/plans.ts` and enforced on the server (embed page, booking, form settings, API keys, webhook delivery).
 
 | | Free | Pro |
 |---|---|---|
 | Booking page + embed, auto-resize | ✓ | ✓ |
+| Staff, booking rules, standard form fields | ✓ | ✓ |
 | Online bookings per month | 50 | Unlimited |
 | "Powered by BookSlot" badge | Shown | Hidden |
-| Theme overrides (colors, radius, font, dark mode) | — | ✓ |
-| Preselect service, prefill customer | — | ✓ |
+| Theme overrides (colours, radius, font, dark mode) | — | ✓ |
+| Preselect service or staff, prefill customer | — | ✓ |
 | Custom questions on the booking form | — | ✓ |
-| Public API (`/api/v1`) and signed webhooks | — | ✓ |
 | `booked` / `error` events to the host page | — | ✓ |
+| Public API (`/api/v1`) and signed webhooks | — | ✓ |
 
-There is no payment integration: invoice the customer, then set the plan by hand.
+There is no payment integration: invoice the customer, then set the plan by hand (check which database your env file points at first):
 
 ```bash
 npx tsx --env-file=.env.local scripts/set-plan.ts your-shop-slug pro
 ```
 
-Check which database your env file points at before running it.
+## How it works
 
-## Environment variables
+1. **App:** Next.js 16 (App Router) and Tailwind CSS 4. The dashboard runs on server actions; owners sign in with a bcrypt-hashed password and a signed JWT session cookie (`jose`).
+2. **Data:** Drizzle ORM over libSQL: a SQLite file locally, Turso in production. Migrations live in `drizzle/` and run as part of `npm run build`.
+3. **Booking UI:** one React component (`src/components/booking-widget.tsx`) serves both `/book/[slug]` and `/embed/[slug]`. It loads free times from `/api/availability`, computed in the shop's time zone from weekly hours, breaks, date overrides, staff hours, time off and booking rules (`src/lib/slots.ts`, `src/lib/booking.ts`).
+4. **Embed:** `/widget.js` (`src/lib/widget-script.ts`) is a dependency-free script that mounts the `/embed/[slug]` iframe and talks to it by `postMessage` (resize, prefill, events). `src/proxy.ts` sets each embed's `frame-ancestors` from the shop's allowed sites; every other page sends `frame-ancestors 'none'`.
+5. **Email and cron:** Resend sends the confirmation on booking. A Vercel cron (`vercel.json`, daily at 07:00 UTC) calls `/api/cron/reminders`, which sends due reminders and retries failing webhook deliveries.
 
-See `.env.example`:
+## Run locally
+
+```bash
+npm install
+cp .env.example .env.local
+npm run db:setup   # migrate + seed a demo shop into data/bookslot.db
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) and sign in with the local seed account `demo@bookslot.mk` / `demo12345`. Its booking page is [/book/demo-salon](http://localhost:3000/book/demo-salon) and its widget [/embed/demo-salon](http://localhost:3000/embed/demo-salon). For the [/demo](http://localhost:3000/demo) sites, run `scripts/seed-examples.ts` first (see [`examples/`](examples/README.md)).
 
 | Variable | Required | Description |
-|----------|----------|-------------|
-| `NEXT_PUBLIC_APP_URL` | Production | Public URL of your app |
+|---|---|---|
+| `NEXT_PUBLIC_APP_URL` | Production | Public URL of the app, used in emails, embed codes and the API docs |
 | `AUTH_SECRET` | Production | JWT signing secret (`openssl rand -base64 32`) |
-| `DATABASE_URL` | Yes | SQLite file locally, Turso/libsql in production |
-| `RESEND_API_KEY` | Optional | Send confirmation & reminder emails |
+| `DATABASE_URL` | Production | Defaults to `file:./data/bookslot.db`; a `libsql://` Turso URL in production (`TURSO_DATABASE_URL` also works) |
+| `DATABASE_AUTH_TOKEN` | With Turso | Turso token (`TURSO_AUTH_TOKEN` also works) |
+| `CRON_SECRET` | Production | Protects `/api/cron/reminders`; without it the endpoint only runs in development |
+| `RESEND_API_KEY` | Optional | Sends confirmation and reminder emails; without it they're logged to the console |
 | `EMAIL_FROM` | Optional | Sender address for Resend |
-| `CRON_SECRET` | Production | Protects `/api/cron/reminders` |
 | `NEXT_PUBLIC_SALES_EMAIL` | Optional | Shown on the dashboard as the "ask us to upgrade" link |
 
-Without `RESEND_API_KEY`, emails are logged to the console (fine for development).
-
-## Production deployment (Vercel)
-
-1. Push to GitHub
-2. Import project in Vercel
-3. Set environment variables
-4. Use **Turso** for database:
-   ```
-   DATABASE_URL=libsql://your-db.turso.io
-   DATABASE_AUTH_TOKEN=your-token
-   ```
-5. Cron job for reminders is configured in `vercel.json` (runs hourly)
-
-Run migrations on deploy (included in `npm run build`).
-
-## Project structure
-
-```
-src/
-├── app/
-│   ├── book/[slug]/       # Public booking page
-│   ├── embed/[slug]/      # Embeddable widget (iframe)
-│   ├── widget.js/         # Script embed endpoint
-│   ├── dashboard/         # Shop owner dashboard
-│   ├── api/availability/  # Slot availability API
-│   └── api/cron/reminders/  # Reminder cron job
-├── components/
-│   └── booking-widget.tsx # Shared booking UI
-├── db/                    # Drizzle schema
-└── lib/                   # Auth, slots, email, actions
-```
-
-## Scripts
+To deploy on Vercel, import the repo, set these variables with a Turso database and deploy: `npm run build` applies migrations first, and the reminder cron comes from `vercel.json`.
 
 | Command | Description |
-|---------|-------------|
-| `npm run dev` | Start dev server |
-| `npm run build` | Migrate DB + production build |
-| `npm run db:setup` | Migrate + seed demo data |
-| `npm run db:seed` | Seed demo shop only |
-| `npm run example:pro` | Next.js example site on port 3001 (see `examples/`) |
-| `npm test` | Unit tests (slot engine, slugs, email escaping) and booking integration tests on a throwaway SQLite file |
+|---|---|
+| `npm run dev` / `npm start` | Dev server / serve the production build |
+| `npm run build` | Migrate the database, then build for production |
+| `npm run lint` | ESLint |
+| `npm test` / `npm run test:watch` | Vitest: slot engine, booking rules and form, embed, theme, API, webhooks, email escaping, plus booking integration tests on a throwaway SQLite file |
+| `npm run db:generate` | Generate a migration from `src/db/schema.ts` |
+| `npm run db:setup` | Migrate + seed the demo shop (`db:migrate` and `db:seed` run them separately) |
+| `npm run example:pro` | Next.js example site on port 3001 (see [`examples/`](examples/README.md)) |
+| `npm run build:react` | Build `@bookslot/react` into `packages/react/dist` |
 
-## Roadmap (not in v1)
+CI (`.github/workflows/test.yml`) type-checks, lints, tests and builds the React package on pull requests and pushes to `main`.
 
-- Viber/SMS reminders via Akton or Infobip
-- Stripe / local payment deposits
-- Albanian language UI
-- Mobile app for shop owners
+## Known limitations
+
+- No online payments: plans are switched by hand after an invoice, and clients can't pay deposits.
+- Reminders are email only. The cron runs once a day, so a reminder goes out on the first run after its time, not at the exact hour.
+- The interface is English only.
 
 ## License
 
-Private — all rights reserved.
+The [`@bookslot/react`](packages/react) package is [MIT](packages/react/LICENSE). The rest of this repository is all rights reserved.
