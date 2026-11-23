@@ -39,7 +39,7 @@ export default async function CancelDonePage({
           Your appointment is still booked.{" "}
           <Link
             href={`/cancel/${encodeURIComponent(token)}`}
-            className="text-blue-600 hover:underline"
+            className="text-brand-600 hover:underline"
           >
             Cancel it here
           </Link>

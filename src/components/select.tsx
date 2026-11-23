@@ -11,7 +11,9 @@ export function Select({
   return (
     <select
       className={cn(
-        "w-full rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-sm outline-none ring-blue-600 focus:ring-2",
+        // appearance-none: Safari ignores padding on native selects, so they'd be
+        // shorter than the inputs next to them. The chevron comes from globals.css.
+        "select-chevron w-full appearance-none rounded-lg border border-zinc-300 bg-white py-2.5 pr-9 pl-3 text-sm outline-none ring-brand-600 focus:ring-2",
         className,
       )}
       {...props}
