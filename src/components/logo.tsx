@@ -1,25 +1,31 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
-/** The app icon (src/app/icon.svg) drawn inline so it scales crisply. */
+/**
+ * The calendar mark, with no background: lines in the current text colour
+ * (so it matches the wordmark next to it), binder rings and the booked
+ * slot in the brand colour. Same drawing as the favicon (src/app/icon.svg).
+ */
 export function LogoMark({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 512 512" aria-hidden="true" className={cn("size-8 shrink-0", className)}>
-      <rect width="512" height="512" rx="112" fill="#0f1117" />
-      <rect x="163" y="80" width="26" height="64" rx="13" fill="#6366f1" />
-      <rect x="323" y="80" width="26" height="64" rx="13" fill="#6366f1" />
-      <rect x="96" y="112" width="320" height="308" rx="48" fill="#151a26" stroke="#2a3242" strokeWidth="8" />
-      <path d="M100 184 H412" stroke="#2a3242" strokeWidth="8" />
-      <circle cx="164" cy="248" r="20" fill="#39435a" />
-      <circle cx="256" cy="248" r="20" fill="#39435a" />
-      <circle cx="348" cy="248" r="20" fill="#39435a" />
-      <circle cx="164" cy="340" r="20" fill="#39435a" />
-      <rect x="220" y="308" width="168" height="64" rx="32" fill="#6366f1" />
+    <svg viewBox="0 0 32 32" fill="none" aria-hidden="true" className={cn("size-8 shrink-0", className)}>
+      <rect x="3.1" y="5.5" width="25.8" height="23.5" rx="5" stroke="currentColor" strokeWidth="2.2" />
+      <path d="M3.1 11.3H28.9" stroke="currentColor" strokeWidth="2.2" />
+      <g fill="currentColor" opacity="0.35">
+        <circle cx="8.6" cy="16.4" r="1.6" />
+        <circle cx="16" cy="16.4" r="1.6" />
+        <circle cx="23.4" cy="16.4" r="1.6" />
+        <circle cx="8.6" cy="23.4" r="1.6" />
+      </g>
+      <g className="fill-brand-600">
+        <rect x="8.2" y="2.4" width="2.6" height="6" rx="1.3" />
+        <rect x="21.2" y="2.4" width="2.6" height="6" rx="1.3" />
+        <rect x="13" y="20.7" width="13.8" height="5.4" rx="2.7" />
+      </g>
       <path
-        d="M258 340 l20 20 l38 -42"
-        stroke="#ffffff"
-        strokeWidth="18"
-        fill="none"
+        d="M16.6 23.4l1.5 1.5 3.1-3.2"
+        stroke="white"
+        strokeWidth="1.5"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
