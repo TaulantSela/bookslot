@@ -163,6 +163,19 @@ To deploy on Vercel, import the repo, set these variables with a Turso database 
 | `npm run build:react` | Build `@bookslot/react` into `packages/react/dist` |
 | `npm run demo:record -- http://localhost:3000` | Re-record the looping booking video on `/demo` (`public/demo/`) with Chrome and ffmpeg, against a local build on a scratch database; steps in [`scripts/record-demo.mts`](scripts/record-demo.mts) |
 
+`db:migrate`, `db:seed` and `db:setup` only run on a local SQLite file (the
+default) or on a remote database marked as a disposable dev database
+([`scripts/db-guard.ts`](scripts/db-guard.ts)), so they can't change production
+from a laptop. `bookslot-dev` is marked; production never is, and gets its
+migrations from `npm run build`. `set-plan.ts` and `seed-examples.ts` aren't
+guarded: they're meant for production too. To mark a new dev database (never
+production), run this once against it, e.g. in the Turso shell:
+
+```sql
+CREATE TABLE _disposable (mark TEXT NOT NULL);
+INSERT INTO _disposable VALUES ('bookslot:disposable');
+```
+
 CI (`.github/workflows/test.yml`) type-checks, lints, tests and builds the React package on pull requests and pushes to `main`.
 
 ## Known limitations

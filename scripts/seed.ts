@@ -10,8 +10,12 @@ import {
 } from "../src/db/schema";
 import { hashPassword } from "../src/lib/auth";
 import { newId } from "../src/lib/id";
+import { assertDisposableDatabase } from "./db-guard";
 
 async function main() {
+  // The demo account's password is public: only on a local file or the dev database (db-guard.ts).
+  await assertDisposableDatabase();
+
   const url =
     process.env.DATABASE_URL ??
     process.env.TURSO_DATABASE_URL ??
