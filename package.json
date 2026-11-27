@@ -15,7 +15,8 @@
     "test:watch": "vitest",
     "example:pro": "next dev examples/nextjs-pro --webpack -p 3001",
     "build:react": "npm run build --prefix packages/react",
-    "demo:record": "tsx scripts/record-demo.mts"
+    "demo:record": "tsx scripts/record-demo.mts",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@libsql/client": "^0.17.3",
@@ -39,14 +40,26 @@
     "@types/node": "^22.20.5",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@typescript/native": "npm:typescript@^7.0.2",
     "drizzle-kit": "^0.31.10",
-    "eslint": "^9",
+    "eslint": "^10.15.0",
     "eslint-config-next": "16.4.6",
     "puppeteer-core": "^25.18.1",
     "tailwindcss": "^4",
     "tsup": "^8.5.1",
     "tsx": "^4.22.4",
-    "typescript": "^5",
+    "typescript": "npm:@typescript/typescript6@^6.0.2",
     "vitest": "^5.1.0"
+  },
+  "overrides": {
+    "eslint-plugin-react": {
+      "eslint": "$eslint"
+    },
+    "eslint-plugin-import": {
+      "eslint": "$eslint"
+    },
+    "eslint-plugin-jsx-a11y": {
+      "eslint": "$eslint"
+    }
   }
 }
